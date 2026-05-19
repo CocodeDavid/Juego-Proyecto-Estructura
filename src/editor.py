@@ -12,6 +12,7 @@ from settings import (
     COLOR_SPAWN_PLAYER,
     COLOR_WALL,
     COLS,
+    DEFAULT_PLAYER_SPAWN,
     EDITOR_TITLE,
     ENEMY_TYPE_BASIC,
     FPS,
@@ -40,9 +41,13 @@ class LevelEditor:
         self.grid = Grid(ROWS, COLS, TILE_SIZE)
         self.selected_tile = TILE_WALL
         self.running = False
-        self.player_spawn = {"row": 3, "col": 3}
+        self.player_spawn = {"row": DEFAULT_PLAYER_SPAWN[0], "col": DEFAULT_PLAYER_SPAWN[1]}
 
-        self._set_tile(self.player_spawn["row"], self.player_spawn["col"], TILE_SPAWN_PLAYER)
+        self._set_tile(
+            self.player_spawn["row"],
+            self.player_spawn["col"],
+            TILE_SPAWN_PLAYER,
+        )
 
     def run(self) -> None:
         """Run the editor loop and process input."""
@@ -95,7 +100,7 @@ class LevelEditor:
     def _erase_tile(self, row: int, col: int) -> None:
         """Erase a tile and reset spawn data when needed."""
         if self.grid.tiles[row][col] == TILE_SPAWN_PLAYER:
-            self.player_spawn = {"row": 0, "col": 0}
+            self.player_spawn = {"row": DEFAULT_PLAYER_SPAWN[0], "col": DEFAULT_PLAYER_SPAWN[1]}
         self._set_tile(row, col, TILE_FLOOR)
 
     def _set_tile(self, row: int, col: int, value: int) -> None:

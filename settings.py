@@ -15,6 +15,8 @@ TILE_SPAWN_ENEMY = 3
 DETECTION_RADIUS = 5
 LEVEL_NAME = "Nivel 1"
 ENEMY_TYPE_BASIC = "basic"
+DEFAULT_PLAYER_SPAWN = (3, 3)
+DEFAULT_ENEMY_SPAWN = (10, 10)
 
 WINDOW_TITLE = "Juego Estructuras de Datos"
 EDITOR_TITLE = "Editor de niveles"

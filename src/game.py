@@ -2,7 +2,17 @@
 
 import pygame
 
-from settings import COLOR_BG, COLS, FPS, HEIGHT, ROWS, TILE_SIZE, WIDTH, WINDOW_TITLE
+from settings import (
+    COLOR_BG,
+    COLS,
+    DEFAULT_PLAYER_SPAWN,
+    FPS,
+    HEIGHT,
+    ROWS,
+    TILE_SIZE,
+    WIDTH,
+    WINDOW_TITLE,
+)
 from src.enemy import Enemy
 from src.grid import Grid
 from src.player import Player
@@ -14,7 +24,12 @@ class Game:
     def __init__(self) -> None:
         """Initialize the game state and core objects."""
         self.grid = Grid(ROWS, COLS, TILE_SIZE)
-        self.player = Player(self.grid.cell_to_pixel_center(1, 1))
+        self.player = Player(
+            self.grid.cell_to_pixel_center(
+                DEFAULT_PLAYER_SPAWN[0],
+                DEFAULT_PLAYER_SPAWN[1],
+            )
+        )
         self.enemies: list[Enemy] = []
 
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))

@@ -10,6 +10,8 @@ from settings import (
     COLOR_SPAWN_PLAYER,
     COLOR_WALL,
     COLS,
+    DEFAULT_ENEMY_SPAWN,
+    DEFAULT_PLAYER_SPAWN,
     FPS,
     HEIGHT,
     ROWS,
@@ -30,8 +32,10 @@ def build_placeholder_grid(rows: int, cols: int) -> list[list[int]]:
         for col in range(cols):
             if row in (0, rows - 1) or col in (0, cols - 1):
                 grid[row][col] = TILE_WALL
-    grid[3][3] = TILE_SPAWN_PLAYER
-    grid[10][10] = TILE_SPAWN_ENEMY
+    player_row, player_col = DEFAULT_PLAYER_SPAWN
+    enemy_row, enemy_col = DEFAULT_ENEMY_SPAWN
+    grid[player_row][player_col] = TILE_SPAWN_PLAYER
+    grid[enemy_row][enemy_col] = TILE_SPAWN_ENEMY
     return grid
 
 
