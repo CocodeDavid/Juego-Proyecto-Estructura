@@ -1,4 +1,5 @@
-"""Global settings and constants for the game project."""
+"Configuraciones GLobales para estilo del juego"
+"No tocar nombres de las variables"
 
 TILE_SIZE = 32
 COLS = 25
