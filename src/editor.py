@@ -30,10 +30,12 @@ from src.grid import Grid
 
 
 class LevelEditor:
-    """Grid-based editor for creating and saving levels."""
-
+    
+    "EN python no existe el private, public o proteted"
+    "No es necesario la definicion de los atributos"
+    "Para declarar un atributo hacemos self.nombreatributo"
     def __init__(self) -> None:
-        """Initialize the editor window, grid, and state."""
+        """Iconstructor y sus atributos"""
         pygame.init()
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption(EDITOR_TITLE)
@@ -49,24 +51,24 @@ class LevelEditor:
             TILE_SPAWN_PLAYER,
         )
 
-    def run(self) -> None:
-        """Run the editor loop and process input."""
+    def arranque(self) -> None:
+        """Pantalla del editor"""
         self.running = True
         while self.running:
-            self._handle_events()
+            self.InteraccionesdelUsuario()
             self._draw()
             self.clock.tick(FPS)
         pygame.quit()
 
-    def _handle_events(self) -> None:
-        """Handle keyboard and mouse events for the editor."""
+    def InteraccionesdelUsuario(self) -> None:
+        """Aca se manejan o manejaran que pasa si el usuario hace click o tecla algo"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.KEYDOWN:
                 self._handle_toolbar_keys(event.key)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                self._handle_mouse_click(event.button, event.pos)
+                self.InteracciondeClickdeMouse(event.button, event.pos)
 
     def _handle_toolbar_keys(self, key: int) -> None:
         """Update the selected tile based on toolbar key presses."""
@@ -79,7 +81,7 @@ class LevelEditor:
         elif key == pygame.K_4:
             self.selected_tile = TILE_SPAWN_ENEMY
 
-    def _handle_mouse_click(self, button: int, pos: tuple[int, int]) -> None:
+    def InteracciondeClickdeMouse(self, button: int, pos: tuple[int, int]) -> None:
         """Paint or erase tiles based on mouse clicks."""
         row = pos[1] // TILE_SIZE
         col = pos[0] // TILE_SIZE
@@ -156,7 +158,7 @@ class LevelEditor:
 def main() -> None:
     """Launch the level editor."""
     editor = LevelEditor()
-    editor.run()
+    editor.arranque()
 
 
 if __name__ == "__main__":
