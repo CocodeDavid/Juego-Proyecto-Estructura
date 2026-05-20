@@ -29,5 +29,5 @@ python main.py
 Para abrir el editor de niveles:
 
 ```bash
-python src/editor.py
+python -m src.editor
 ```
