@@ -25,9 +25,17 @@ from settings import (
 )
 
 
-def build_placeholder_grid(rows: int, cols: int) -> list[list[int]]:
+def generadordegrilla(rows: int, cols: int) -> list[list[int]]:
     """Create a simple grid with border walls and spawn markers."""
-    grid = [[TILE_FLOOR for _ in range(cols)] for _ in range(rows)]
+    grid = []
+    for _ in range(rows):
+        fila_actual = [] 
+    
+        for _ in range(cols):
+            fila_actual.append(TILE_FLOOR) 
+
+        grid.append(fila_actual)
+
     for row in range(rows):
         for col in range(cols):
             if row in (0, rows - 1) or col in (0, cols - 1):
@@ -62,7 +70,7 @@ def main() -> None:
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption(WINDOW_TITLE)
     clock = pygame.time.Clock()
-    grid = build_placeholder_grid(ROWS, COLS)
+    grid = generadordegrilla(ROWS, COLS)
 
     running = True
     while running:
