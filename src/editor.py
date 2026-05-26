@@ -54,7 +54,9 @@ class LevelEditor:
     def __init__(self) -> None:
         """Inicializa el editor y sus atributos principales."""
         pygame.init()
-        self.pantalla = pygame.display.set_mode((ANCHO + ANCHO_BARRA_HERRAMIENTAS, ALTO))
+        self.pantalla = pygame.display.set_mode(
+            (ANCHO + ANCHO_BARRA_HERRAMIENTAS, ALTO)
+        )
         pygame.display.set_caption(TITULO_EDITOR)
         self.reloj = pygame.time.Clock()
         self.cuadricula = Grid(FILAS, COLUMNAS, TAMANO_CELDA)
