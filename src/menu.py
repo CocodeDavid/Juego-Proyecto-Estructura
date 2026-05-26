@@ -424,6 +424,9 @@ class Menu:
         """Restablece la ventana para el menú después de cerrar subpantallas."""
         self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
         pygame.display.set_caption(TITULO_VENTANA)
+        pygame.font.init()
+        self.fuente_titulo = pygame.font.SysFont(None, TAMANO_FUENTE_TITULO_MENU)
+        self.fuente_boton = pygame.font.SysFont(None, TAMANO_FUENTE_BOTON_MENU)
 
     def _cargar_configuracion(self) -> str:
         """Carga la configuración del algoritmo desde disco."""

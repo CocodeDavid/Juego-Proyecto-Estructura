@@ -63,4 +63,5 @@ class Game:
     def dibujar(self) -> None:
         """Dibuja la escena del juego en la ventana."""
         self.pantalla.fill(COLOR_FONDO)
+        self.cuadricula.dibujar(self.pantalla)
         pygame.display.flip()
