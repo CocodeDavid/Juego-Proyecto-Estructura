@@ -1,50 +1,50 @@
-"""Grid representation and helpers."""
+"""Representación de la cuadrícula y utilidades."""
 
 import json
 
-from settings import TILE_FLOOR, TILE_WALL
+from settings import CELDA_MURO, CELDA_SUELO
 
 
 class Grid:
-    """Represents a 2D grid of tiles for the game world."""
+    """Representa una cuadrícula 2D de baldosas para el mundo del juego."""
 
-    def __init__(self, rows: int, cols: int, tile_size: int) -> None:
-        """Initialize the grid with floor tiles."""
-        self.rows = rows
-        self.cols = cols
-        self.tile_size = tile_size
-        self.tiles = [[TILE_FLOOR for _ in range(cols)] for _ in range(rows)]
+    def __init__(self, filas: int, columnas: int, tamano_celda: int) -> None:
+        """Inicializa la cuadrícula con baldosas de suelo."""
+        self.filas = filas
+        self.columnas = columnas
+        self.tamano_celda = tamano_celda
+        self.celdas = [[CELDA_SUELO for _ in range(columnas)] for _ in range(filas)]
 
-    def load_from_json(self, path: str) -> None:
-        """Load grid tiles from a JSON level file."""
-        with open(path, "r", encoding="utf-8") as file:
-            data = json.load(file)
-        self.rows = data["rows"]
-        self.cols = data["cols"]
-        self.tiles = data["tiles"]
+    def cargar_desde_json(self, ruta: str) -> None:
+        """Carga las baldosas desde un archivo JSON de nivel."""
+        with open(ruta, "r", encoding="utf-8") as archivo:
+            datos = json.load(archivo)
+        self.filas = datos["rows"]
+        self.columnas = datos["cols"]
+        self.celdas = datos["tiles"]
 
-    def is_walkable(self, row: int, col: int) -> bool:
-        """Return True if a cell is inside bounds and not a wall."""
-        if row < 0 or col < 0 or row >= self.rows or col >= self.cols:
+    def es_transitable(self, fila: int, columna: int) -> bool:
+        """Devuelve True si la celda está dentro de los límites y no es muro."""
+        if fila < 0 or columna < 0 or fila >= self.filas or columna >= self.columnas:
             return False
-        return self.tiles[row][col] != TILE_WALL
+        return self.celdas[fila][columna] != CELDA_MURO
 
-    def get_neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
-        """Return walkable 4-directional neighbors for a cell."""
-        neighbors: list[tuple[int, int]] = []
-        for delta_row, delta_col in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            next_row = row + delta_row
-            next_col = col + delta_col
-            if self.is_walkable(next_row, next_col):
-                neighbors.append((next_row, next_col))
-        return neighbors
+    def obtener_vecinos(self, fila: int, columna: int) -> list[tuple[int, int]]:
+        """Devuelve vecinos transitables en las 4 direcciones."""
+        vecinos: list[tuple[int, int]] = []
+        for delta_fila, delta_columna in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            fila_siguiente = fila + delta_fila
+            columna_siguiente = columna + delta_columna
+            if self.es_transitable(fila_siguiente, columna_siguiente):
+                vecinos.append((fila_siguiente, columna_siguiente))
+        return vecinos
 
-    def pixel_to_cell(self, x: int, y: int) -> tuple[int, int]:
-        """Convert pixel coordinates to grid cell coordinates."""
-        return (y // self.tile_size, x // self.tile_size)
+    def pixel_a_celda(self, x: int, y: int) -> tuple[int, int]:
+        """Convierte coordenadas de píxeles a coordenadas de celda."""
+        return (y // self.tamano_celda, x // self.tamano_celda)
 
-    def cell_to_pixel_center(self, row: int, col: int) -> tuple[int, int]:
-        """Return pixel coordinates for the center of a cell."""
-        center_x = col * self.tile_size + self.tile_size // 2
-        center_y = row * self.tile_size + self.tile_size // 2
-        return (center_x, center_y)
+    def celda_a_pixel_centro(self, fila: int, columna: int) -> tuple[int, int]:
+        """Devuelve las coordenadas del centro de una celda en píxeles."""
+        centro_x = columna * self.tamano_celda + self.tamano_celda // 2
+        centro_y = fila * self.tamano_celda + self.tamano_celda // 2
+        return (centro_x, centro_y)

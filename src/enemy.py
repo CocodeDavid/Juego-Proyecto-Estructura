@@ -1,38 +1,38 @@
-"""Enemy entity definitions and AI state management."""
+"""Definiciones de enemigos y manejo de estados de IA."""
 
 from enum import Enum, auto
 
-from settings import DETECTION_RADIUS
+from settings import RADIO_DETECCION
 
 
 class EnemyState(Enum):
-    """Finite states for enemy behavior."""
+    """Estados finitos para el comportamiento del enemigo."""
 
-    PATROL = auto()
-    ALERT = auto()
-    CHASE = auto()
-    ATTACK = auto()
+    PATRULLA = auto()
+    ALERTA = auto()
+    PERSECUCION = auto()
+    ATAQUE = auto()
 
 
 class Enemy:
-    """Represents an enemy with basic finite-state behavior."""
+    """Representa un enemigo con un comportamiento básico de estados."""
 
-    def __init__(self, row: int, col: int) -> None:
-        """Initialize the enemy at a grid cell position."""
-        self.row = row
-        self.col = col
-        self.state = EnemyState.PATROL
-        self.detection_radius = DETECTION_RADIUS
-        self.path: list[tuple[int, int]] = []
+    def __init__(self, fila: int, columna: int) -> None:
+        """Inicializa el enemigo en una celda de la cuadrícula."""
+        self.fila = fila
+        self.columna = columna
+        self.estado = EnemyState.PATRULLA
+        self.radio_deteccion = RADIO_DETECCION
+        self.ruta: list[tuple[int, int]] = []
 
-    def update(self, grid, player_pos: tuple[int, int]) -> None:
-        """Update the enemy behavior based on grid and player position."""
+    def actualizar(self, cuadricula, posicion_jugador: tuple[int, int]) -> None:
+        """Actualiza el comportamiento del enemigo según la cuadrícula y el jugador."""
         pass
 
-    def _patrol(self, grid) -> None:
-        """Handle patrol behavior by selecting waypoints and wandering."""
+    def _patrullar(self, cuadricula) -> None:
+        """Maneja la patrulla seleccionando puntos de recorrido."""
         pass
 
-    def _chase(self, grid, player_pos: tuple[int, int]) -> None:
-        """Handle chasing behavior by following a path toward the player."""
+    def _perseguir(self, cuadricula, posicion_jugador: tuple[int, int]) -> None:
+        """Maneja la persecución siguiendo una ruta hacia el jugador."""
         pass

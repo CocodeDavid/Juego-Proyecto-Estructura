@@ -1,165 +1,187 @@
-"""Simple level editor for grid-based maps."""
+"""Editor de niveles para mapas en cuadrícula."""
 
 import json
 
 import pygame
 
 from settings import (
-    COLOR_BG,
-    COLOR_FLOOR,
-    COLOR_GRID,
-    COLOR_SPAWN_ENEMY,
-    COLOR_SPAWN_PLAYER,
-    COLOR_WALL,
-    COLS,
-    DEFAULT_PLAYER_SPAWN,
-    EDITOR_TITLE,
-    ENEMY_TYPE_BASIC,
-    FPS,
-    HEIGHT,
-    LEVEL_NAME,
-    ROWS,
-    TILE_FLOOR,
-    TILE_SIZE,
-    TILE_SPAWN_ENEMY,
-    TILE_SPAWN_PLAYER,
-    TILE_WALL,
-    WIDTH,
+    ALTO,
+    ANCHO,
+    APARICION_JUGADOR_POR_DEFECTO,
+    CELDA_APARICION_ENEMIGO,
+    CELDA_APARICION_JUGADOR,
+    CELDA_MURO,
+    CELDA_SUELO,
+    COLOR_APARICION_ENEMIGO,
+    COLOR_APARICION_JUGADOR,
+    COLOR_FONDO,
+    COLOR_MURO,
+    COLOR_REJILLA,
+    COLOR_SUELO,
+    COLUMNAS,
+    FILAS,
+    FOTOGRAMAS_POR_SEGUNDO,
+    NOMBRE_NIVEL,
+    TAMANO_CELDA,
+    TIPO_ENEMIGO_BASICO,
+    TITULO_EDITOR,
 )
 from src.grid import Grid
 
 
 class LevelEditor:
-    
-    "EN python no existe el private, public o proteted"
-    "No es necesario la definicion de los atributos"
-    "Para declarar un atributo hacemos self.nombreatributo"
-    def __init__(self) -> None:
-        """Iconstructor y sus atributos"""
-        pygame.init()
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption(EDITOR_TITLE)
-        self.clock = pygame.time.Clock()
-        self.grid = Grid(ROWS, COLS, TILE_SIZE)
-        self.selected_tile = TILE_WALL
-        self.running = False
-        self.player_spawn = {"row": DEFAULT_PLAYER_SPAWN[0], "col": DEFAULT_PLAYER_SPAWN[1]}
+    """Editor de niveles basado en cuadrícula."""
 
-        self._set_tile(
-            self.player_spawn["row"],
-            self.player_spawn["col"],
-            TILE_SPAWN_PLAYER,
+    def __init__(self) -> None:
+        """Inicializa el editor y sus atributos principales."""
+        pygame.init()
+        self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
+        pygame.display.set_caption(TITULO_EDITOR)
+        self.reloj = pygame.time.Clock()
+        self.cuadricula = Grid(FILAS, COLUMNAS, TAMANO_CELDA)
+        self.baldosa_seleccionada = CELDA_MURO
+        self.en_ejecucion = False
+        self.aparicion_jugador = {
+            "fila": APARICION_JUGADOR_POR_DEFECTO[0],
+            "columna": APARICION_JUGADOR_POR_DEFECTO[1],
+        }
+
+        self._establecer_celda(
+            self.aparicion_jugador["fila"],
+            self.aparicion_jugador["columna"],
+            CELDA_APARICION_JUGADOR,
         )
 
-    def arranque(self) -> None:
-        """Pantalla del editor"""
-        self.running = True
-        while self.running:
-            self.InteraccionesdelUsuario()
-            self._draw()
-            self.clock.tick(FPS)
+    def ejecutar(self) -> None:
+        """Ejecuta la pantalla del editor."""
+        self.en_ejecucion = True
+        while self.en_ejecucion:
+            self.manejar_eventos()
+            self._dibujar()
+            self.reloj.tick(FOTOGRAMAS_POR_SEGUNDO)
         pygame.quit()
 
-    def InteraccionesdelUsuario(self) -> None:
-        """Aca se manejan o manejaran que pasa si el usuario hace click o tecla algo"""
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            elif event.type == pygame.KEYDOWN:
-                self._handle_toolbar_keys(event.key)
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                self.InteracciondeClickdeMouse(event.button, event.pos)
+    def manejar_eventos(self) -> None:
+        """Maneja clicks y teclas del usuario dentro del editor."""
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                self.en_ejecucion = False
+            elif evento.type == pygame.KEYDOWN:
+                self._manejar_teclas_barra(evento.key)
+            elif evento.type == pygame.MOUSEBUTTONDOWN:
+                self.manejar_click_mouse(evento.button, evento.pos)
 
-    def _handle_toolbar_keys(self, key: int) -> None:
-        """Update the selected tile based on toolbar key presses."""
-        if key == pygame.K_1:
-            self.selected_tile = TILE_FLOOR
-        elif key == pygame.K_2:
-            self.selected_tile = TILE_WALL
-        elif key == pygame.K_3:
-            self.selected_tile = TILE_SPAWN_PLAYER
-        elif key == pygame.K_4:
-            self.selected_tile = TILE_SPAWN_ENEMY
+    def _manejar_teclas_barra(self, tecla: int) -> None:
+        """Actualiza la baldosa seleccionada según el teclado."""
+        if tecla == pygame.K_1:
+            self.baldosa_seleccionada = CELDA_SUELO
+        elif tecla == pygame.K_2:
+            self.baldosa_seleccionada = CELDA_MURO
+        elif tecla == pygame.K_3:
+            self.baldosa_seleccionada = CELDA_APARICION_JUGADOR
+        elif tecla == pygame.K_4:
+            self.baldosa_seleccionada = CELDA_APARICION_ENEMIGO
 
-    def InteracciondeClickdeMouse(self, button: int, pos: tuple[int, int]) -> None:
-        """Paint or erase tiles based on mouse clicks."""
-        row = pos[1] // TILE_SIZE
-        col = pos[0] // TILE_SIZE
-        if row < 0 or col < 0 or row >= self.grid.rows or col >= self.grid.cols:
+    def manejar_click_mouse(self, boton: int, posicion: tuple[int, int]) -> None:
+        """Pinta o borra baldosas según el botón presionado."""
+        fila = posicion[1] // TAMANO_CELDA
+        columna = posicion[0] // TAMANO_CELDA
+        if (
+            fila < 0
+            or columna < 0
+            or fila >= self.cuadricula.filas
+            or columna >= self.cuadricula.columnas
+        ):
             return
-        if button == 1:
-            self._paint_tile(row, col)
-        elif button == 3:
-            self._erase_tile(row, col)
+        if boton == 1:
+            self._pintar_celda(fila, columna)
+        elif boton == 3:
+            self._borrar_celda(fila, columna)
 
-    def _paint_tile(self, row: int, col: int) -> None:
-        """Paint the selected tile onto the grid."""
-        if self.selected_tile == TILE_SPAWN_PLAYER:
-            self._set_tile(self.player_spawn["row"], self.player_spawn["col"], TILE_FLOOR)
-            self.player_spawn = {"row": row, "col": col}
-        self._set_tile(row, col, self.selected_tile)
+    def _pintar_celda(self, fila: int, columna: int) -> None:
+        """Pinta la baldosa seleccionada en la cuadrícula."""
+        if self.baldosa_seleccionada == CELDA_APARICION_JUGADOR:
+            self._establecer_celda(
+                self.aparicion_jugador["fila"],
+                self.aparicion_jugador["columna"],
+                CELDA_SUELO,
+            )
+            self.aparicion_jugador = {"fila": fila, "columna": columna}
+        self._establecer_celda(fila, columna, self.baldosa_seleccionada)
 
-    def _erase_tile(self, row: int, col: int) -> None:
-        """Erase a tile and reset spawn data when needed."""
-        if self.grid.tiles[row][col] == TILE_SPAWN_PLAYER:
-            self.player_spawn = {"row": DEFAULT_PLAYER_SPAWN[0], "col": DEFAULT_PLAYER_SPAWN[1]}
-        self._set_tile(row, col, TILE_FLOOR)
+    def _borrar_celda(self, fila: int, columna: int) -> None:
+        """Borra una baldosa y reinicia apariciones si corresponde."""
+        if self.cuadricula.celdas[fila][columna] == CELDA_APARICION_JUGADOR:
+            self.aparicion_jugador = {
+                "fila": APARICION_JUGADOR_POR_DEFECTO[0],
+                "columna": APARICION_JUGADOR_POR_DEFECTO[1],
+            }
+        self._establecer_celda(fila, columna, CELDA_SUELO)
 
-    def _set_tile(self, row: int, col: int, value: int) -> None:
-        """Set the value of a grid tile."""
-        self.grid.tiles[row][col] = value
+    def _establecer_celda(self, fila: int, columna: int, valor: int) -> None:
+        """Asigna el valor de una baldosa en la cuadrícula."""
+        self.cuadricula.celdas[fila][columna] = valor
 
-    def _scan_spawns(self) -> tuple[dict[str, int], list[dict[str, int | str]]]:
-        """Scan the grid to find player and enemy spawn tiles."""
-        player_spawn = self.player_spawn
-        enemy_spawns: list[dict[str, int | str]] = []
-        for row in range(self.grid.rows):
-            for col in range(self.grid.cols):
-                tile = self.grid.tiles[row][col]
-                if tile == TILE_SPAWN_PLAYER:
-                    player_spawn = {"row": row, "col": col}
-                elif tile == TILE_SPAWN_ENEMY:
-                    enemy_spawns.append({"row": row, "col": col, "type": ENEMY_TYPE_BASIC})
-        return player_spawn, enemy_spawns
+    def _buscar_apariciones(
+        self,
+    ) -> tuple[dict[str, int], list[dict[str, int | str]]]:
+        """Escanea la cuadrícula para localizar apariciones."""
+        aparicion_jugador = self.aparicion_jugador
+        apariciones_enemigo: list[dict[str, int | str]] = []
+        for fila in range(self.cuadricula.filas):
+            for columna in range(self.cuadricula.columnas):
+                baldosa = self.cuadricula.celdas[fila][columna]
+                if baldosa == CELDA_APARICION_JUGADOR:
+                    aparicion_jugador = {"fila": fila, "columna": columna}
+                elif baldosa == CELDA_APARICION_ENEMIGO:
+                    apariciones_enemigo.append(
+                        {"fila": fila, "columna": columna, "tipo": TIPO_ENEMIGO_BASICO}
+                    )
+        return aparicion_jugador, apariciones_enemigo
 
-    def _draw(self) -> None:
-        """Draw the editor grid and tiles."""
-        self.screen.fill(COLOR_BG)
-        for row, row_tiles in enumerate(self.grid.tiles):
-            for col, tile in enumerate(row_tiles):
-                if tile == TILE_WALL:
-                    color = COLOR_WALL
-                elif tile == TILE_SPAWN_PLAYER:
-                    color = COLOR_SPAWN_PLAYER
-                elif tile == TILE_SPAWN_ENEMY:
-                    color = COLOR_SPAWN_ENEMY
+    def _dibujar(self) -> None:
+        """Dibuja la cuadrícula y las baldosas del editor."""
+        self.pantalla.fill(COLOR_FONDO)
+        for fila, fila_baldosas in enumerate(self.cuadricula.celdas):
+            for columna, baldosa in enumerate(fila_baldosas):
+                if baldosa == CELDA_MURO:
+                    color = COLOR_MURO
+                elif baldosa == CELDA_APARICION_JUGADOR:
+                    color = COLOR_APARICION_JUGADOR
+                elif baldosa == CELDA_APARICION_ENEMIGO:
+                    color = COLOR_APARICION_ENEMIGO
                 else:
-                    color = COLOR_FLOOR
-                rect = pygame.Rect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-                pygame.draw.rect(self.screen, color, rect)
-                pygame.draw.rect(self.screen, COLOR_GRID, rect, 1)
+                    color = COLOR_SUELO
+                rectangulo = pygame.Rect(
+                    columna * TAMANO_CELDA,
+                    fila * TAMANO_CELDA,
+                    TAMANO_CELDA,
+                    TAMANO_CELDA,
+                )
+                pygame.draw.rect(self.pantalla, color, rectangulo)
+                pygame.draw.rect(self.pantalla, COLOR_REJILLA, rectangulo, 1)
         pygame.display.flip()
 
-    def save_to_json(self, path: str) -> None:
-        """Save the current grid and spawns to a JSON file."""
-        player_spawn, enemy_spawns = self._scan_spawns()
-        level_data = {
-            "name": LEVEL_NAME,
-            "rows": self.grid.rows,
-            "cols": self.grid.cols,
-            "tiles": self.grid.tiles,
-            "player_spawn": player_spawn,
-            "enemy_spawns": enemy_spawns,
+    def guardar_a_json(self, ruta: str) -> None:
+        """Guarda la cuadrícula y apariciones en un archivo JSON."""
+        aparicion_jugador, apariciones_enemigo = self._buscar_apariciones()
+        datos_nivel = {
+            "name": NOMBRE_NIVEL,
+            "rows": self.cuadricula.filas,
+            "cols": self.cuadricula.columnas,
+            "tiles": self.cuadricula.celdas,
+            "player_spawn": aparicion_jugador,
+            "enemy_spawns": apariciones_enemigo,
         }
-        with open(path, "w", encoding="utf-8") as file:
-            json.dump(level_data, file, indent=2, ensure_ascii=False)
+        with open(ruta, "w", encoding="utf-8") as archivo:
+            json.dump(datos_nivel, archivo, indent=2, ensure_ascii=False)
 
 
-def main() -> None:
-    """Launch the level editor."""
+def principal() -> None:
+    """Lanza el editor de niveles."""
     editor = LevelEditor()
-    editor.arranque()
+    editor.ejecutar()
 
 
 if __name__ == "__main__":
-    main()
+    principal()
