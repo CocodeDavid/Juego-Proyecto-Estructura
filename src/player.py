@@ -1,29 +1,31 @@
-"""Player entity logic."""
+"""Lógica de la entidad del jugador."""
 
-from src.pathfinding import astar
+from src.pathfinding import a_estrella
 
 
 class Player:
-    """Represents the player-controlled character."""
+    """Representa al personaje controlado por el jugador."""
 
-    def __init__(self, position: tuple[int, int]) -> None:
-        """Initialize the player at a pixel position."""
-        self.position = position
-        self.path: list[tuple[int, int]] = []
-        self.open_set: set[tuple[int, int]] = set()
-        self.closed_set: set[tuple[int, int]] = set()
+    def __init__(self, posicion: tuple[int, int]) -> None:
+        """Inicializa el jugador en una posición de píxeles."""
+        self.posicion = posicion
+        self.ruta: list[tuple[int, int]] = []
+        self.conjunto_abierto: set[tuple[int, int]] = set()
+        self.conjunto_cerrado: set[tuple[int, int]] = set()
 
-    def set_destination(self, grid, goal_cell: tuple[int, int]) -> None:
-        """Compute a path to a goal cell and store it."""
-        start_cell = grid.pixel_to_cell(*self.position)
-        path, open_set, closed_set = astar(grid, start_cell, goal_cell)
-        self.path = path
-        self.open_set = open_set
-        self.closed_set = closed_set
+    def establecer_destino(self, cuadricula, celda_objetivo: tuple[int, int]) -> None:
+        """Calcula una ruta hacia la celda objetivo y la almacena."""
+        celda_inicio = cuadricula.pixel_a_celda(*self.posicion)
+        ruta, conjunto_abierto, conjunto_cerrado = a_estrella(
+            cuadricula, celda_inicio, celda_objetivo
+        )
+        self.ruta = ruta
+        self.conjunto_abierto = conjunto_abierto
+        self.conjunto_cerrado = conjunto_cerrado
 
-    def update(self, grid) -> None:
-        """Move one step along the path each frame."""
-        if not self.path:
+    def actualizar(self, cuadricula) -> None:
+        """Avanza un paso por la ruta en cada fotograma."""
+        if not self.ruta:
             return
-        next_cell = self.path.pop(0)
-        self.position = grid.cell_to_pixel_center(*next_cell)
+        siguiente_celda = self.ruta.pop(0)
+        self.posicion = cuadricula.celda_a_pixel_centro(*siguiente_celda)

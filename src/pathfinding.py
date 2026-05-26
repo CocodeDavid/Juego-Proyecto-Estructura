@@ -1,93 +1,93 @@
-"""Pathfinding algorithms for grid navigation."""
+"""Algoritmos de búsqueda para navegación en cuadrículas."""
 
 import heapq
 from collections import deque
 from itertools import count
 
 
-def heuristic(a: tuple[int, int], b: tuple[int, int]) -> int:
-    """Return the Manhattan distance between two grid cells."""
-    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+def heuristica(celda_a: tuple[int, int], celda_b: tuple[int, int]) -> int:
+    """Devuelve la distancia Manhattan entre dos celdas."""
+    return abs(celda_a[0] - celda_b[0]) + abs(celda_a[1] - celda_b[1])
 
 
-def astar(
-    grid,
-    start: tuple[int, int],
-    goal: tuple[int, int],
+def a_estrella(
+    cuadricula,
+    inicio: tuple[int, int],
+    objetivo: tuple[int, int],
 ) -> tuple[list[tuple[int, int]], set[tuple[int, int]], set[tuple[int, int]]]:
-    """Compute an A* path and return path, open set, and closed set."""
-    if not grid.is_walkable(*start) or not grid.is_walkable(*goal):
+    """Calcula una ruta A* y devuelve ruta, abiertos y cerrados."""
+    if not cuadricula.es_transitable(*inicio) or not cuadricula.es_transitable(*objetivo):
         return ([], set(), set())
 
-    frontier: list[tuple[int, int, tuple[int, int]]] = []
-    counter = count()
-    heapq.heappush(frontier, (0, next(counter), start))
+    frontera: list[tuple[int, int, tuple[int, int]]] = []
+    contador = count()
+    heapq.heappush(frontera, (0, next(contador), inicio))
 
-    came_from: dict[tuple[int, int], tuple[int, int] | None] = {start: None}
-    g_score = {start: 0}
-    open_nodes = {start}
-    closed_nodes: set[tuple[int, int]] = set()
+    viene_de: dict[tuple[int, int], tuple[int, int] | None] = {inicio: None}
+    costo_g = {inicio: 0}
+    nodos_abiertos = {inicio}
+    nodos_cerrados: set[tuple[int, int]] = set()
 
-    while frontier:
-        _, _, current = heapq.heappop(frontier)
-        if current in closed_nodes:
+    while frontera:
+        _, _, actual = heapq.heappop(frontera)
+        if actual in nodos_cerrados:
             continue
 
-        open_nodes.discard(current)
-        closed_nodes.add(current)
+        nodos_abiertos.discard(actual)
+        nodos_cerrados.add(actual)
 
-        if current == goal:
+        if actual == objetivo:
             break
 
-        for neighbor in grid.get_neighbors(*current):
-            if neighbor in closed_nodes:
+        for vecino in cuadricula.obtener_vecinos(*actual):
+            if vecino in nodos_cerrados:
                 continue
 
-            tentative_g = g_score[current] + 1
-            if tentative_g < g_score.get(neighbor, float("inf")):
-                came_from[neighbor] = current
-                g_score[neighbor] = tentative_g
-                f_score = tentative_g + heuristic(neighbor, goal)
-                heapq.heappush(frontier, (f_score, next(counter), neighbor))
-                open_nodes.add(neighbor)
+            costo_tentativo = costo_g[actual] + 1
+            if costo_tentativo < costo_g.get(vecino, float("inf")):
+                viene_de[vecino] = actual
+                costo_g[vecino] = costo_tentativo
+                costo_f = costo_tentativo + heuristica(vecino, objetivo)
+                heapq.heappush(frontera, (costo_f, next(contador), vecino))
+                nodos_abiertos.add(vecino)
 
-    if goal not in came_from:
-        return ([], open_nodes, closed_nodes)
+    if objetivo not in viene_de:
+        return ([], nodos_abiertos, nodos_cerrados)
 
-    path: list[tuple[int, int]] = []
-    node: tuple[int, int] | None = goal
-    while node is not None:
-        path.append(node)
-        node = came_from[node]
-    path.reverse()
+    ruta: list[tuple[int, int]] = []
+    nodo: tuple[int, int] | None = objetivo
+    while nodo is not None:
+        ruta.append(nodo)
+        nodo = viene_de[nodo]
+    ruta.reverse()
 
-    return (path, open_nodes, closed_nodes)
+    return (ruta, nodos_abiertos, nodos_cerrados)
 
 
-def bfs_detect(
-    grid,
-    origin: tuple[int, int],
-    target: tuple[int, int],
-    radius: int,
+def detectar_bfs(
+    cuadricula,
+    origen: tuple[int, int],
+    objetivo: tuple[int, int],
+    radio: int,
 ) -> bool:
-    """Return True if target is reachable within radius steps using BFS."""
-    if origin == target:
+    """Devuelve True si el objetivo es alcanzable en el radio usando BFS."""
+    if origen == objetivo:
         return True
 
-    queue = deque([(origin, 0)])
-    visited = {origin}
+    cola = deque([(origen, 0)])
+    visitados = {origen}
 
-    while queue:
-        current, steps = queue.popleft()
-        if steps >= radius:
+    while cola:
+        actual, pasos = cola.popleft()
+        if pasos >= radio:
             continue
 
-        for neighbor in grid.get_neighbors(*current):
-            if neighbor in visited:
+        for vecino in cuadricula.obtener_vecinos(*actual):
+            if vecino in visitados:
                 continue
-            if neighbor == target:
+            if vecino == objetivo:
                 return True
-            visited.add(neighbor)
-            queue.append((neighbor, steps + 1))
+            visitados.add(vecino)
+            cola.append((vecino, pasos + 1))
 
     return False
