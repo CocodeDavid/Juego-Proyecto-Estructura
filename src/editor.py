@@ -25,8 +25,27 @@ from settings import (
     TAMANO_CELDA,
     TIPO_ENEMIGO_BASICO,
     TITULO_EDITOR,
+    TITULO_VENTANA,
 )
 from src.grid import Grid
+
+ANCHO_BARRA_HERRAMIENTAS = 160
+ANCHO_BOTON_MATERIAL = 140
+ALTO_BOTON_MATERIAL = 48
+ESPACIADO_BOTONES_MATERIAL = 8
+ALTO_BOTON_ACCION = 44
+ESPACIADO_BOTONES_ACCION = 8
+MARGEN_SUPERIOR_BARRA = 12
+MARGEN_INFERIOR_ACCIONES = 16
+MARGEN_LATERAL_BOTON = (ANCHO_BARRA_HERRAMIENTAS - ANCHO_BOTON_MATERIAL) // 2
+TAMANO_COLOR_MATERIAL = 24
+
+COLOR_BARRA_HERRAMIENTAS = (30, 30, 40)
+COLOR_TEXTO_BARRA = (255, 255, 255)
+COLOR_BOTON_MATERIAL = (45, 45, 60)
+COLOR_BORDE_SELECCION = (255, 255, 255)
+COLOR_BOTON_GUARDAR = (60, 100, 160)
+COLOR_BOTON_VOLVER = (80, 60, 60)
 
 
 class LevelEditor:
@@ -35,12 +54,29 @@ class LevelEditor:
     def __init__(self) -> None:
         """Inicializa el editor y sus atributos principales."""
         pygame.init()
-        self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
+        self.pantalla = pygame.display.set_mode((ANCHO + ANCHO_BARRA_HERRAMIENTAS, ALTO))
         pygame.display.set_caption(TITULO_EDITOR)
         self.reloj = pygame.time.Clock()
         self.cuadricula = Grid(FILAS, COLUMNAS, TAMANO_CELDA)
         self.baldosa_seleccionada = CELDA_MURO
         self.en_ejecucion = False
+        self.ancho_barra_herramientas = ANCHO_BARRA_HERRAMIENTAS
+        self.fuente_barra = pygame.font.SysFont(None, 16)
+        self.fuente_botones_barra = pygame.font.SysFont(None, 16)
+        self.materiales = [
+            {"valor": CELDA_SUELO, "nombre": "Suelo", "color": (50, 50, 50)},
+            {"valor": CELDA_MURO, "nombre": "Pared", "color": (100, 80, 60)},
+            {
+                "valor": CELDA_APARICION_JUGADOR,
+                "nombre": "Spawn Jugador",
+                "color": (50, 180, 80),
+            },
+            {
+                "valor": CELDA_APARICION_ENEMIGO,
+                "nombre": "Spawn Enemigo",
+                "color": (180, 60, 60),
+            },
+        ]
         self.aparicion_jugador = {
             "fila": APARICION_JUGADOR_POR_DEFECTO[0],
             "columna": APARICION_JUGADOR_POR_DEFECTO[1],
@@ -59,13 +95,13 @@ class LevelEditor:
             self.manejar_eventos()
             self._dibujar()
             self.reloj.tick(FOTOGRAMAS_POR_SEGUNDO)
-        pygame.quit()
+        self._restablecer_ventana_menu()
 
     def manejar_eventos(self) -> None:
         """Maneja clicks y teclas del usuario dentro del editor."""
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
-                self.en_ejecucion = False
+                self._volver_al_menu()
             elif evento.type == pygame.KEYDOWN:
                 self._manejar_teclas_barra(evento.key)
             elif evento.type == pygame.MOUSEBUTTONDOWN:
@@ -84,8 +120,11 @@ class LevelEditor:
 
     def manejar_click_mouse(self, boton: int, posicion: tuple[int, int]) -> None:
         """Pinta o borra baldosas según el botón presionado."""
+        if posicion[0] < self.ancho_barra_herramientas:
+            self._manejar_click_barra(posicion)
+            return
         fila = posicion[1] // TAMANO_CELDA
-        columna = posicion[0] // TAMANO_CELDA
+        columna = (posicion[0] - self.ancho_barra_herramientas) // TAMANO_CELDA
         if (
             fila < 0
             or columna < 0
@@ -142,6 +181,7 @@ class LevelEditor:
     def _dibujar(self) -> None:
         """Dibuja la cuadrícula y las baldosas del editor."""
         self.pantalla.fill(COLOR_FONDO)
+        self._dibujar_barra_herramientas()
         for fila, fila_baldosas in enumerate(self.cuadricula.celdas):
             for columna, baldosa in enumerate(fila_baldosas):
                 if baldosa == CELDA_MURO:
@@ -153,7 +193,7 @@ class LevelEditor:
                 else:
                     color = COLOR_SUELO
                 rectangulo = pygame.Rect(
-                    columna * TAMANO_CELDA,
+                    self.ancho_barra_herramientas + columna * TAMANO_CELDA,
                     fila * TAMANO_CELDA,
                     TAMANO_CELDA,
                     TAMANO_CELDA,
@@ -175,6 +215,124 @@ class LevelEditor:
         }
         with open(ruta, "w", encoding="utf-8") as archivo:
             json.dump(datos_nivel, archivo, indent=2, ensure_ascii=False)
+
+    def guardar(self) -> None:
+        """Muestra un mensaje de guardado pendiente."""
+        print("Guardar: funcionalidad pendiente")
+
+    def _volver_al_menu(self) -> None:
+        """Solicita el cierre del editor y regreso al menú."""
+        self.en_ejecucion = False
+
+    def _restablecer_ventana_menu(self) -> None:
+        """Restablece la ventana principal antes de volver al menú."""
+        pygame.display.set_mode((ANCHO, ALTO))
+        pygame.display.set_caption(TITULO_VENTANA)
+
+    def _obtener_botones_materiales(self) -> list[dict[str, object]]:
+        """Devuelve la configuración visual de los botones de materiales."""
+        botones: list[dict[str, object]] = []
+        titulo = self.fuente_barra.render("Materiales", True, COLOR_TEXTO_BARRA)
+        inicio_y = titulo.get_rect().height + MARGEN_SUPERIOR_BARRA + 16
+        for indice, material in enumerate(self.materiales):
+            y = inicio_y + indice * (ALTO_BOTON_MATERIAL + ESPACIADO_BOTONES_MATERIAL)
+            rect = pygame.Rect(
+                MARGEN_LATERAL_BOTON,
+                y,
+                ANCHO_BOTON_MATERIAL,
+                ALTO_BOTON_MATERIAL,
+            )
+            botones.append({"rect": rect, **material})
+        return botones
+
+    def _obtener_botones_accion(self) -> list[dict[str, object]]:
+        """Devuelve los botones de acción de la barra de herramientas."""
+        botones: list[dict[str, object]] = []
+        y_volver = ALTO - MARGEN_INFERIOR_ACCIONES - ALTO_BOTON_ACCION
+        y_guardar = y_volver - ESPACIADO_BOTONES_ACCION - ALTO_BOTON_ACCION
+        botones.append(
+            {
+                "rect": pygame.Rect(
+                    MARGEN_LATERAL_BOTON,
+                    y_guardar,
+                    ANCHO_BOTON_MATERIAL,
+                    ALTO_BOTON_ACCION,
+                ),
+                "texto": "Guardar",
+                "color": COLOR_BOTON_GUARDAR,
+                "accion": self.guardar,
+            }
+        )
+        botones.append(
+            {
+                "rect": pygame.Rect(
+                    MARGEN_LATERAL_BOTON,
+                    y_volver,
+                    ANCHO_BOTON_MATERIAL,
+                    ALTO_BOTON_ACCION,
+                ),
+                "texto": "Volver al menú",
+                "color": COLOR_BOTON_VOLVER,
+                "accion": self._volver_al_menu,
+            }
+        )
+        return botones
+
+    def _dibujar_barra_herramientas(self) -> None:
+        """Dibuja la barra lateral del editor con botones y acciones."""
+        pygame.draw.rect(
+            self.pantalla,
+            COLOR_BARRA_HERRAMIENTAS,
+            pygame.Rect(0, 0, self.ancho_barra_herramientas, ALTO),
+        )
+        titulo = self.fuente_barra.render("Materiales", True, COLOR_TEXTO_BARRA)
+        rect_titulo = titulo.get_rect(
+            midtop=(self.ancho_barra_herramientas // 2, MARGEN_SUPERIOR_BARRA)
+        )
+        self.pantalla.blit(titulo, rect_titulo)
+
+        for boton in self._obtener_botones_materiales():
+            rect = boton["rect"]
+            pygame.draw.rect(self.pantalla, COLOR_BOTON_MATERIAL, rect)
+            if boton["valor"] == self.baldosa_seleccionada:
+                pygame.draw.rect(self.pantalla, COLOR_BORDE_SELECCION, rect, 2)
+
+            cuadrado_color = pygame.Rect(
+                rect.left + 8,
+                rect.centery - TAMANO_COLOR_MATERIAL // 2,
+                TAMANO_COLOR_MATERIAL,
+                TAMANO_COLOR_MATERIAL,
+            )
+            pygame.draw.rect(self.pantalla, boton["color"], cuadrado_color)
+            texto = self.fuente_botones_barra.render(
+                boton["nombre"], True, COLOR_TEXTO_BARRA
+            )
+            rect_texto = texto.get_rect()
+            rect_texto.midleft = (
+                cuadrado_color.right + 8,
+                rect.centery,
+            )
+            self.pantalla.blit(texto, rect_texto)
+
+        for boton in self._obtener_botones_accion():
+            rect = boton["rect"]
+            pygame.draw.rect(self.pantalla, boton["color"], rect)
+            texto = self.fuente_botones_barra.render(
+                boton["texto"], True, COLOR_TEXTO_BARRA
+            )
+            rect_texto = texto.get_rect(center=rect.center)
+            self.pantalla.blit(texto, rect_texto)
+
+    def _manejar_click_barra(self, posicion: tuple[int, int]) -> None:
+        """Gestiona los clicks dentro de la barra de herramientas."""
+        for boton in self._obtener_botones_materiales():
+            if boton["rect"].collidepoint(posicion):
+                self.baldosa_seleccionada = int(boton["valor"])
+                return
+        for boton in self._obtener_botones_accion():
+            if boton["rect"].collidepoint(posicion):
+                boton["accion"]()
+                return
 
 
 def principal() -> None:
