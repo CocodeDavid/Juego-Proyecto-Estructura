@@ -11,12 +11,12 @@ def heuristica(celda_a: tuple[int, int], celda_b: tuple[int, int]) -> int:
 
 
 def a_estrella(
-    cuadricula,
+    grafo,
     inicio: tuple[int, int],
     objetivo: tuple[int, int],
 ) -> tuple[list[tuple[int, int]], set[tuple[int, int]], set[tuple[int, int]]]:
     """Calcula una ruta A* y devuelve ruta, abiertos y cerrados."""
-    if not cuadricula.es_transitable(*inicio) or not cuadricula.es_transitable(*objetivo):
+    if not grafo.es_nodo_valido(inicio) or not grafo.es_nodo_valido(objetivo):
         return ([], set(), set())
 
     frontera: list[tuple[int, int, tuple[int, int]]] = []
@@ -39,7 +39,7 @@ def a_estrella(
         if actual == objetivo:
             break
 
-        for vecino in cuadricula.obtener_vecinos(*actual):
+        for vecino in grafo.obtener_vecinos(actual):
             if vecino in nodos_cerrados:
                 continue
 
@@ -65,7 +65,7 @@ def a_estrella(
 
 
 def detectar_bfs(
-    cuadricula,
+    grafo,
     origen: tuple[int, int],
     objetivo: tuple[int, int],
     radio: int,
@@ -82,7 +82,7 @@ def detectar_bfs(
         if pasos >= radio:
             continue
 
-        for vecino in cuadricula.obtener_vecinos(*actual):
+        for vecino in grafo.obtener_vecinos(actual):
             if vecino in visitados:
                 continue
             if vecino == objetivo:

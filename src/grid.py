@@ -5,11 +5,13 @@ import json
 import pygame
 
 from settings import (
+    APARICION_JUGADOR_POR_DEFECTO,
     CELDA_APARICION_ENEMIGO,
     CELDA_APARICION_JUGADOR,
     CELDA_MURO,
     CELDA_SUELO,
 )
+from src.grafo import Grafo
 
 
 class Grid:
@@ -21,6 +23,10 @@ class Grid:
         self.columnas = columnas
         self.tamano_celda = tamano_celda
         self.celdas = [[CELDA_SUELO for _ in range(columnas)] for _ in range(filas)]
+        self.spawn_jugador = APARICION_JUGADOR_POR_DEFECTO
+        # self.celdas es la representación visual, self.grafo es la estructura para búsquedas.
+        self.grafo = Grafo()
+        self.grafo.construir_desde_grilla(self)
 
     def cargar_desde_json(self, ruta: str) -> None:
         """Carga las baldosas desde un archivo JSON de nivel."""
@@ -38,6 +44,9 @@ class Grid:
                 "Error al cargar nivel: dimensiones inválidas. Se generó un perímetro de muros."
             )
             self._rellenar_perimetro_muros()
+            self.spawn_jugador = APARICION_JUGADOR_POR_DEFECTO
+            self.grafo = Grafo()
+            self.grafo.construir_desde_grilla(self)
             return
         self.filas = filas
         self.columnas = columnas
@@ -47,8 +56,27 @@ class Grid:
                 "Error al cargar nivel: la cuadrícula no coincide con las dimensiones o está vacía. Se generó un perímetro de muros."
             )
             self._rellenar_perimetro_muros()
+            self.spawn_jugador = APARICION_JUGADOR_POR_DEFECTO
+            self.grafo = Grafo()
+            self.grafo.construir_desde_grilla(self)
             return
         self.celdas = baldosas
+        self.spawn_jugador = self._leer_spawn_jugador(datos)
+        # self.celdas es la representación visual, self.grafo es la estructura para búsquedas.
+        self.grafo = Grafo()
+        self.grafo.construir_desde_grilla(self)
+
+    def _leer_spawn_jugador(self, datos: dict) -> tuple[int, int]:
+        """Obtiene la posición de aparición del jugador desde el JSON."""
+        fila = APARICION_JUGADOR_POR_DEFECTO[0]
+        columna = APARICION_JUGADOR_POR_DEFECTO[1]
+        aparicion = datos.get("player_spawn", {})
+        if isinstance(aparicion, dict):
+            fila = int(aparicion.get("fila", aparicion.get("row", fila)))
+            columna = int(aparicion.get("columna", aparicion.get("col", columna)))
+        if fila < 0 or columna < 0 or fila >= self.filas or columna >= self.columnas:
+            return APARICION_JUGADOR_POR_DEFECTO
+        return (fila, columna)
 
     def _validar_baldosas(self, baldosas: object) -> bool:
         """Valida la estructura y el contenido de las baldosas cargadas."""
