@@ -31,3 +31,5 @@ Para abrir el editor de niveles:
 ```bash
 python -m src.editor
 ```
+
+Comentario agregado para verificar el pull request.
