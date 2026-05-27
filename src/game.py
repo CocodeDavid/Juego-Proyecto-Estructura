@@ -3,19 +3,19 @@
 import pygame
 
 from settings import (
+    ALTO,
     ANCHO,
-    APARICION_JUGADOR_POR_DEFECTO,
     COLOR_FONDO,
     COLUMNAS,
     FILAS,
     FOTOGRAMAS_POR_SEGUNDO,
+    MODO_DEBUG,
     TAMANO_CELDA,
     TITULO_VENTANA,
-    ALTO,
 )
 from src.enemy import Enemy
 from src.grid import Grid
-from src.player import Player
+from src.player import Jugador
 
 
 class Game:
@@ -23,19 +23,21 @@ class Game:
 
     def __init__(self) -> None:
         """Inicializa el estado del juego y los objetos principales."""
+        self.offset_x = 160
         self.cuadricula = Grid(FILAS, COLUMNAS, TAMANO_CELDA)
-        self.jugador = Player(
-            self.cuadricula.celda_a_pixel_centro(
-                APARICION_JUGADOR_POR_DEFECTO[0],
-                APARICION_JUGADOR_POR_DEFECTO[1],
-            )
-        )
+        self.jugador = Jugador(self.cuadricula.spawn_jugador)
         self.enemigos: list[Enemy] = []
+        self.modo_debug = MODO_DEBUG
 
         self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
         pygame.display.set_caption(TITULO_VENTANA)
         self.reloj = pygame.time.Clock()
         self.en_ejecucion = False
+
+    def cargar_nivel(self, ruta: str) -> None:
+        """Carga un nivel y reposiciona al jugador."""
+        self.cuadricula.cargar_desde_json(ruta)
+        self.jugador = Jugador(self.cuadricula.spawn_jugador)
 
     def ejecutar(self) -> None:
         """Ejecuta el bucle principal con eventos, actualización y renderizado."""
@@ -51,17 +53,58 @@ class Game:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 self.en_ejecucion = False
+            elif evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_F1:
+                    self.modo_debug = not self.modo_debug
+                elif evento.key in (pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d):
+                    teclas = pygame.key.get_pressed()
+                    self.jugador.manejar_teclas(teclas, self.cuadricula.grafo)
+            elif evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
+                self.jugador.establecer_destino_click(
+                    evento.pos,
+                    self.cuadricula.grafo,
+                    offset_x=self.offset_x,
+                )
 
     def actualizar(self) -> None:
         """Actualiza los objetos del juego en cada fotograma."""
-        self.jugador.actualizar(self.cuadricula)
+        self.jugador.actualizar()
         for enemigo in self.enemigos:
             enemigo.actualizar(
-                self.cuadricula, self.cuadricula.pixel_a_celda(*self.jugador.posicion)
+                self.cuadricula, (self.jugador.fila, self.jugador.columna)
             )
 
     def dibujar(self) -> None:
         """Dibuja la escena del juego en la ventana."""
         self.pantalla.fill(COLOR_FONDO)
         self.cuadricula.dibujar(self.pantalla)
+        self.jugador.dibujar(self.pantalla, offset_x=self.offset_x)
+        if self.modo_debug:
+            self._dibujar_debug_bfs()
         pygame.display.flip()
+
+    def _dibujar_debug_bfs(self) -> None:
+        """Dibuja los nodos visitados y la ruta BFS."""
+        superficie = pygame.Surface(self.pantalla.get_size(), pygame.SRCALPHA)
+        color_visitados = (60, 120, 200, 120)
+        color_ruta = (250, 250, 60, 200)
+
+        for nodo in self.jugador.nodos_visitados_bfs:
+            rect = pygame.Rect(
+                self.offset_x + nodo[1] * TAMANO_CELDA,
+                nodo[0] * TAMANO_CELDA,
+                TAMANO_CELDA,
+                TAMANO_CELDA,
+            )
+            pygame.draw.rect(superficie, color_visitados, rect)
+
+        for nodo in self.jugador.ruta_actual:
+            rect = pygame.Rect(
+                self.offset_x + nodo[1] * TAMANO_CELDA,
+                nodo[0] * TAMANO_CELDA,
+                TAMANO_CELDA,
+                TAMANO_CELDA,
+            )
+            pygame.draw.rect(superficie, color_ruta, rect)
+
+        self.pantalla.blit(superficie, (0, 0))

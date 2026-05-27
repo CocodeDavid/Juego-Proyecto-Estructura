@@ -13,7 +13,6 @@ from settings import (
     ANCHO_BORDE_SELECTOR,
     ANCHO_BOTON_MENU,
     ALTO_BOTON_MENU,
-    APARICION_JUGADOR_POR_DEFECTO,
     COLOR_BOTON,
     COLOR_BOTON_ACTIVO,
     COLOR_BOTON_HOVER,
@@ -391,20 +390,9 @@ class Menu:
         from src.game import Game
 
         ruta = nivel.get("ruta")
-        datos = nivel.get("datos") if isinstance(nivel.get("datos"), dict) else {}
         juego = Game()
         if isinstance(ruta, Path):
-            juego.cuadricula.cargar_desde_json(str(ruta))
-
-        aparicion = {}
-        if isinstance(datos, dict):
-            aparicion = datos.get("player_spawn", {})
-        fila = APARICION_JUGADOR_POR_DEFECTO[0]
-        columna = APARICION_JUGADOR_POR_DEFECTO[1]
-        if isinstance(aparicion, dict):
-            fila = int(aparicion.get("row", fila))
-            columna = int(aparicion.get("col", columna))
-        juego.jugador.posicion = juego.cuadricula.celda_a_pixel_centro(fila, columna)
+            juego.cargar_nivel(str(ruta))
         juego.ejecutar()
 
         self._restablecer_menu()
