@@ -24,7 +24,7 @@ class Grid:
         self.tamano_celda = tamano_celda
         self.celdas = [[CELDA_SUELO for _ in range(columnas)] for _ in range(filas)]
         self.spawn_jugador = APARICION_JUGADOR_POR_DEFECTO
-        # self.celdas es la representación visual, self.grafo es la estructura para búsquedas.
+        self.spawns_enemigos: list[tuple[int, int]] = [] # <--- NUEVO
         self.grafo = Grafo()
         self.grafo.construir_desde_grilla(self)
 
@@ -62,6 +62,7 @@ class Grid:
             return
         self.celdas = baldosas
         self.spawn_jugador = self._leer_spawn_jugador(datos)
+        self.spawns_enemigos = self._leer_spawns_enemigos(datos) # <--- AÑADIR ESTO
         # self.celdas es la representación visual, self.grafo es la estructura para búsquedas.
         self.grafo = Grafo()
         self.grafo.construir_desde_grilla(self)
@@ -77,6 +78,19 @@ class Grid:
         if fila < 0 or columna < 0 or fila >= self.filas or columna >= self.columnas:
             return APARICION_JUGADOR_POR_DEFECTO
         return (fila, columna)
+    
+    def _leer_spawns_enemigos(self, datos: dict) -> list[tuple[int, int]]:
+        """Obtiene una lista de posiciones de aparición de los enemigos desde el JSON."""
+        spawns = []
+        apariciones = datos.get("enemy_spawns", [])
+        if isinstance(apariciones, list):
+            for aparicion in apariciones:
+                if isinstance(aparicion, dict):
+                    fila = int(aparicion.get("fila", -1))
+                    columna = int(aparicion.get("columna", -1))
+                    if 0 <= fila < self.filas and 0 <= columna < self.columnas:
+                        spawns.append((fila, columna))
+        return spawns
 
     def _validar_baldosas(self, baldosas: object) -> bool:
         """Valida la estructura y el contenido de las baldosas cargadas."""
