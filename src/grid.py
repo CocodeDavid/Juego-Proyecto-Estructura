@@ -72,8 +72,8 @@ class Grid:
         columna = APARICION_JUGADOR_POR_DEFECTO[1]
         aparicion = datos.get("player_spawn", {})
         if isinstance(aparicion, dict):
-            fila = int(aparicion.get("fila", aparicion.get("row", fila)))
-            columna = int(aparicion.get("columna", aparicion.get("col", columna)))
+            fila = int(aparicion.get("fila", fila))
+            columna = int(aparicion.get("columna", columna))
         if fila < 0 or columna < 0 or fila >= self.filas or columna >= self.columnas:
             return APARICION_JUGADOR_POR_DEFECTO
         return (fila, columna)
@@ -107,20 +107,20 @@ class Grid:
             self.celdas[fila][0] = CELDA_MURO
             self.celdas[fila][self.columnas - 1] = CELDA_MURO
 
-    def dibujar(self, pantalla: pygame.Surface) -> None:
-        """Dibuja la cuadrícula en la superficie indicada."""
+    def dibujar(self, pantalla: pygame.Surface, offset_x: int = 0) -> None:
+        """Dibuja la cuadrícula en la superficie aplicando un desplazamiento en X."""
         colores = {
-            CELDA_SUELO: (50, 50, 50),
-            CELDA_MURO: (100, 80, 60),
-            CELDA_APARICION_JUGADOR: (50, 180, 80),
-            CELDA_APARICION_ENEMIGO: (180, 60, 60),
+            CELDA_SUELO: (35, 35, 35),
+            CELDA_MURO: (110, 110, 110),
+            CELDA_APARICION_JUGADOR: (40, 120, 220),
+            CELDA_APARICION_ENEMIGO: (200, 70, 70),
         }
         for fila in range(self.filas):
             for columna in range(self.columnas):
                 valor = self.celdas[fila][columna]
                 color = colores.get(valor, colores[CELDA_SUELO])
                 rectangulo = pygame.Rect(
-                    columna * self.tamano_celda,
+                    offset_x + columna * self.tamano_celda,
                     fila * self.tamano_celda,
                     self.tamano_celda,
                     self.tamano_celda,

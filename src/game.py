@@ -23,7 +23,8 @@ class Game:
 
     def __init__(self) -> None:
         """Inicializa el estado del juego y los objetos principales."""
-        self.offset_x = 160
+        # CORREGIDO: Se cambia a 0 porque la ventana del juego no tiene barra lateral
+        self.offset_x = 0
         self.cuadricula = Grid(FILAS, COLUMNAS, TAMANO_CELDA)
         self.jugador = Jugador(self.cuadricula.spawn_jugador)
         self.enemigos: list[Enemy] = []
