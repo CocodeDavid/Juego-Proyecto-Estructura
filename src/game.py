@@ -1,5 +1,5 @@
 """Bucle de juego y coordinación de alto nivel."""
-
+import sys
 import pygame
 
 from settings import (
@@ -15,6 +15,7 @@ from settings import (
 )
 from src.enemy import Enemy
 from src.grid import Grid
+from src.pause import PauseMenu
 from src.player import Jugador
 
 
@@ -23,7 +24,6 @@ class Game:
 
     def __init__(self) -> None:
         """Inicializa el estado del juego y los objetos principales."""
-        # CORREGIDO: Se cambia a 0 porque la ventana del juego no tiene barra lateral
         self.offset_x = 0
         self.cuadricula = Grid(FILAS, COLUMNAS, TAMANO_CELDA)
         self.jugador = Jugador(self.cuadricula.spawn_jugador)
@@ -34,6 +34,10 @@ class Game:
         pygame.display.set_caption(TITULO_VENTANA)
         self.reloj = pygame.time.Clock()
         self.en_ejecucion = False
+        
+        # Atributos para el menú de pausa
+        self.pausado = False
+        self.menu_pausa = PauseMenu(self.pantalla)
 
     def cargar_nivel(self, ruta: str) -> None:
         """Carga un nivel y reposiciona al jugador."""
@@ -54,21 +58,45 @@ class Game:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 self.en_ejecucion = False
+                
             elif evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_F1:
+                # Activar o desactivar pausa con la tecla Escape
+                if evento.key == pygame.K_ESCAPE:
+                    self.pausado = not self.pausado
+                    
+                elif evento.key == pygame.K_F1:
                     self.modo_debug = not self.modo_debug
-                elif evento.key in (pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d):
+                    
+                # Solo permitir movimiento si NO está pausado
+                elif not self.pausado and evento.key in (pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d):
                     teclas = pygame.key.get_pressed()
                     self.jugador.manejar_teclas(teclas, self.cuadricula.grafo)
+                    
             elif evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
-                self.jugador.establecer_destino_click(
-                    evento.pos,
-                    self.cuadricula.grafo,
-                    offset_x=self.offset_x,
-                )
+                if self.pausado:
+                    # Si el juego está pausado, gestionar clics en el menú
+                    accion = self.menu_pausa.manejar_click(evento.pos)
+                    if accion == "continuar":
+                        self.pausado = False
+                    elif accion == "menu":
+                        self.en_ejecucion = False  # Rompe el bucle para volver a `main.py`/`menu.py`
+                    elif accion == "salir":
+                        pygame.quit()
+                        sys.exit()
+                else:
+                    # Si no está pausado, gestionar movimiento con clic
+                    self.jugador.establecer_destino_click(
+                        evento.pos,
+                        self.cuadricula.grafo,
+                        offset_x=self.offset_x,
+                    )
 
     def actualizar(self) -> None:
         """Actualiza los objetos del juego en cada fotograma."""
+        # Detener la lógica de actualización si el juego está en pausa
+        if self.pausado:
+            return
+            
         self.jugador.actualizar()
         for enemigo in self.enemigos:
             enemigo.actualizar(
@@ -80,8 +108,14 @@ class Game:
         self.pantalla.fill(COLOR_FONDO)
         self.cuadricula.dibujar(self.pantalla)
         self.jugador.dibujar(self.pantalla, offset_x=self.offset_x)
+        
         if self.modo_debug:
             self._dibujar_debug_bfs()
+            
+        # Si está en pausa, se dibuja el menú superpuesto al final
+        if self.pausado:
+            self.menu_pausa.dibujar()
+            
         pygame.display.flip()
 
     def _dibujar_debug_bfs(self) -> None:
