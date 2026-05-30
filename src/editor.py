@@ -1,6 +1,8 @@
 """Editor de niveles para mapas en cuadrícula."""
 
 import json
+import string
+from pathlib import Path
 
 import pygame
 
@@ -21,7 +23,6 @@ from settings import (
     COLUMNAS,
     FILAS,
     FOTOGRAMAS_POR_SEGUNDO,
-    NOMBRE_NIVEL,
     TAMANO_CELDA,
     TIPO_ENEMIGO_BASICO,
     TITULO_EDITOR,
@@ -63,8 +64,8 @@ class LevelEditor:
         self.baldosa_seleccionada = CELDA_MURO
         self.en_ejecucion = False
         self.ancho_barra_herramientas = ANCHO_BARRA_HERRAMIENTAS
-        self.fuente_barra = pygame.font.SysFont(None, 16)
-        self.fuente_botones_barra = pygame.font.SysFont(None, 16)
+        self.fuente_barra = pygame.font.SysFont(None, 18)
+        self.fuente_botones_barra = pygame.font.SysFont(None, 18)
         self.materiales = [
             {"valor": CELDA_SUELO, "nombre": "Suelo", "color": (50, 50, 50)},
             {"valor": CELDA_MURO, "nombre": "Pared", "color": (100, 80, 60)},
@@ -79,6 +80,7 @@ class LevelEditor:
                 "color": (180, 60, 60),
             },
         ]
+        
         self.aparicion_jugador = {
             "fila": APARICION_JUGADOR_POR_DEFECTO[0],
             "columna": APARICION_JUGADOR_POR_DEFECTO[1],
@@ -89,6 +91,12 @@ class LevelEditor:
             self.aparicion_jugador["columna"],
             CELDA_APARICION_JUGADOR,
         )
+
+        # Atributos para el diálogo de guardado
+        self.mostrando_dialogo_guardar = False
+        self.nombre_nivel_input = ""
+        self.btn_dialogo_guardar = pygame.Rect(0, 0, 0, 0)
+        self.btn_dialogo_cancelar = pygame.Rect(0, 0, 0, 0)
 
     def ejecutar(self) -> None:
         """Ejecuta la pantalla del editor."""
@@ -104,10 +112,34 @@ class LevelEditor:
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 self._volver_al_menu()
+            # Si el diálogo de guardado está abierto, bloqueamos el resto de acciones
+            elif self.mostrando_dialogo_guardar:
+                self._manejar_eventos_dialogo(evento)
             elif evento.type == pygame.KEYDOWN:
                 self._manejar_teclas_barra(evento.key)
             elif evento.type == pygame.MOUSEBUTTONDOWN:
                 self.manejar_click_mouse(evento.button, evento.pos)
+                
+    def _manejar_eventos_dialogo(self, evento: pygame.event.Event) -> None:
+        """Procesa eventos cuando la mini ventana de guardado está activa."""
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_ESCAPE:
+                self.mostrando_dialogo_guardar = False
+            elif evento.key == pygame.K_RETURN:
+                if self.nombre_nivel_input.strip():
+                    self._ejecutar_guardado()
+            elif evento.key == pygame.K_BACKSPACE:
+                self.nombre_nivel_input = self.nombre_nivel_input[:-1]
+            else:
+                # Escribir solo caracteres imprimibles (hasta 20 caracteres)
+                if len(self.nombre_nivel_input) < 20 and evento.unicode.isprintable():
+                    self.nombre_nivel_input += evento.unicode
+        elif evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
+            if self.btn_dialogo_guardar.collidepoint(evento.pos):
+                if self.nombre_nivel_input.strip():
+                    self._ejecutar_guardado()
+            elif self.btn_dialogo_cancelar.collidepoint(evento.pos):
+                self.mostrando_dialogo_guardar = False
 
     def _manejar_teclas_barra(self, tecla: int) -> None:
         """Actualiza la baldosa seleccionada según el teclado."""
@@ -125,8 +157,10 @@ class LevelEditor:
         if posicion[0] < self.ancho_barra_herramientas:
             self._manejar_click_barra(posicion)
             return
+            
         fila = posicion[1] // TAMANO_CELDA
         columna = (posicion[0] - self.ancho_barra_herramientas) // TAMANO_CELDA
+        
         if (
             fila < 0
             or columna < 0
@@ -134,6 +168,8 @@ class LevelEditor:
             or columna >= self.cuadricula.columnas
         ):
             return
+            
+        # Click izquierdo pinta. Click derecho borra
         if boton == 1:
             self._pintar_celda(fila, columna)
         elif boton == 3:
@@ -157,11 +193,33 @@ class LevelEditor:
                 "fila": APARICION_JUGADOR_POR_DEFECTO[0],
                 "columna": APARICION_JUGADOR_POR_DEFECTO[1],
             }
+            # Restaurar el spawn default
+            self._establecer_celda(
+                self.aparicion_jugador["fila"],
+                self.aparicion_jugador["columna"],
+                CELDA_APARICION_JUGADOR,
+            )
         self._establecer_celda(fila, columna, CELDA_SUELO)
 
     def _establecer_celda(self, fila: int, columna: int, valor: int) -> None:
         """Asigna el valor de una baldosa en la cuadrícula."""
         self.cuadricula.celdas[fila][columna] = valor
+
+    def borrar_todo(self) -> None:
+        """Borra toda la cuadrícula y restaura las apariciones."""
+        for fila in range(self.cuadricula.filas):
+            for columna in range(self.cuadricula.columnas):
+                self.cuadricula.celdas[fila][columna] = CELDA_SUELO
+                
+        self.aparicion_jugador = {
+            "fila": APARICION_JUGADOR_POR_DEFECTO[0],
+            "columna": APARICION_JUGADOR_POR_DEFECTO[1],
+        }
+        self._establecer_celda(
+            self.aparicion_jugador["fila"],
+            self.aparicion_jugador["columna"],
+            CELDA_APARICION_JUGADOR,
+        )
 
     def _buscar_apariciones(
         self,
@@ -184,6 +242,7 @@ class LevelEditor:
         """Dibuja la cuadrícula y las baldosas del editor."""
         self.pantalla.fill(COLOR_FONDO)
         self._dibujar_barra_herramientas()
+        
         for fila, fila_baldosas in enumerate(self.cuadricula.celdas):
             for columna, baldosa in enumerate(fila_baldosas):
                 if baldosa == CELDA_MURO:
@@ -194,6 +253,7 @@ class LevelEditor:
                     color = COLOR_APARICION_ENEMIGO
                 else:
                     color = COLOR_SUELO
+                    
                 rectangulo = pygame.Rect(
                     self.ancho_barra_herramientas + columna * TAMANO_CELDA,
                     fila * TAMANO_CELDA,
@@ -202,25 +262,57 @@ class LevelEditor:
                 )
                 pygame.draw.rect(self.pantalla, color, rectangulo)
                 pygame.draw.rect(self.pantalla, COLOR_REJILLA, rectangulo, 1)
+                
+        # Dibuja la mini-ventana superpuesta si corresponde
+        if self.mostrando_dialogo_guardar:
+            self._dibujar_dialogo_guardar()
+            
         pygame.display.flip()
 
-    def guardar_a_json(self, ruta: str) -> None:
-        """Guarda la cuadrícula y apariciones en un archivo JSON."""
+    def guardar(self) -> None:
+        """Abre la interfaz de guardado."""
+        self.mostrando_dialogo_guardar = True
+        self.nombre_nivel_input = ""
+
+    def _ejecutar_guardado(self) -> None:
+        """Escribe el nivel en un archivo .json y limpia la grilla."""
+        nombre_original = self.nombre_nivel_input.strip()
+        if not nombre_original:
+            nombre_original = "Nivel Nuevo"
+            
+        # Sanitizar el nombre para convertirlo en un archivo válido
+        caracteres_validos = "-_.() %s%s" % (string.ascii_letters, string.digits)
+        nombre_archivo = "".join(c for c in nombre_original if c in caracteres_validos)
+        nombre_archivo = nombre_archivo.replace(" ", "_").lower()
+        if not nombre_archivo:
+            nombre_archivo = "nivel_nuevo"
+            
+        nombre_archivo += ".json"
+        
+        # Encontrar la carpeta de niveles
+        ruta_base = Path(__file__).resolve().parents[1]
+        ruta_niveles = ruta_base / "levels"
+        ruta_niveles.mkdir(exist_ok=True)
+        ruta_completa = ruta_niveles / nombre_archivo
+
         aparicion_jugador, apariciones_enemigo = self._buscar_apariciones()
+        
         datos_nivel = {
-            "name": NOMBRE_NIVEL,
+            "name": nombre_original,
             "rows": self.cuadricula.filas,
             "cols": self.cuadricula.columnas,
             "tiles": self.cuadricula.celdas,
             "player_spawn": aparicion_jugador,
             "enemy_spawns": apariciones_enemigo,
         }
-        with open(ruta, "w", encoding="utf-8") as archivo:
+        
+        # Guardado en disco
+        with open(ruta_completa, "w", encoding="utf-8") as archivo:
             json.dump(datos_nivel, archivo, indent=2, ensure_ascii=False)
-
-    def guardar(self) -> None:
-        """Muestra un mensaje de guardado pendiente."""
-        print("Guardar: funcionalidad pendiente")
+            
+        # Ocultar el diálogo y borrar todo para seguir editando
+        self.mostrando_dialogo_guardar = False
+        self.borrar_todo()
 
     def _volver_al_menu(self) -> None:
         """Solicita el cierre del editor y regreso al menú."""
@@ -250,8 +342,24 @@ class LevelEditor:
     def _obtener_botones_accion(self) -> list[dict[str, object]]:
         """Devuelve los botones de acción de la barra de herramientas."""
         botones: list[dict[str, object]] = []
+        
         y_volver = ALTO - MARGEN_INFERIOR_ACCIONES - ALTO_BOTON_ACCION
         y_guardar = y_volver - ESPACIADO_BOTONES_ACCION - ALTO_BOTON_ACCION
+        y_borrar = y_guardar - ESPACIADO_BOTONES_ACCION - ALTO_BOTON_ACCION
+        
+        botones.append(
+            {
+                "rect": pygame.Rect(
+                    MARGEN_LATERAL_BOTON,
+                    y_borrar,
+                    ANCHO_BOTON_MATERIAL,
+                    ALTO_BOTON_ACCION,
+                ),
+                "texto": "Borrar todo",
+                "color": (160, 60, 60),
+                "accion": self.borrar_todo,
+            }
+        )
         botones.append(
             {
                 "rect": pygame.Rect(
@@ -318,12 +426,58 @@ class LevelEditor:
 
         for boton in self._obtener_botones_accion():
             rect = boton["rect"]
-            pygame.draw.rect(self.pantalla, boton["color"], rect)
+            pygame.draw.rect(self.pantalla, boton["color"], rect, border_radius=4)
             texto = self.fuente_botones_barra.render(
                 boton["texto"], True, COLOR_TEXTO_BARRA
             )
             rect_texto = texto.get_rect(center=rect.center)
             self.pantalla.blit(texto, rect_texto)
+
+    def _dibujar_dialogo_guardar(self) -> None:
+        """Dibuja la mini ventana emergente para pedir el nombre del nivel."""
+        ancho_dialogo = 400
+        alto_dialogo = 200
+        x = (ANCHO + self.ancho_barra_herramientas - ancho_dialogo) // 2
+        y = (ALTO - alto_dialogo) // 2
+        rect_dialogo = pygame.Rect(x, y, ancho_dialogo, alto_dialogo)
+        
+        # Fondo oscuro semi-transparente
+        superficie_oscura = pygame.Surface((ANCHO + self.ancho_barra_herramientas, ALTO), pygame.SRCALPHA)
+        superficie_oscura.fill((0, 0, 0, 160))
+        self.pantalla.blit(superficie_oscura, (0, 0))
+        
+        # Fondo diálogo
+        pygame.draw.rect(self.pantalla, (45, 45, 55), rect_dialogo, border_radius=8)
+        pygame.draw.rect(self.pantalla, (200, 200, 200), rect_dialogo, 2, border_radius=8)
+        
+        # Texto Título
+        fuente_titulo = pygame.font.SysFont(None, 36)
+        titulo = fuente_titulo.render("Guardar Nivel", True, (255, 255, 255))
+        self.pantalla.blit(titulo, (x + 20, y + 20))
+        
+        # Input Text
+        rect_input = pygame.Rect(x + 20, y + 70, ancho_dialogo - 40, 40)
+        pygame.draw.rect(self.pantalla, (20, 20, 25), rect_input)
+        pygame.draw.rect(self.pantalla, (100, 100, 120), rect_input, 2)
+        
+        fuente_input = pygame.font.SysFont(None, 28)
+        # Efecto de guion parpadeante simulando cursor
+        texto_render = self.nombre_nivel_input + ("_" if pygame.time.get_ticks() % 1000 < 500 else "")
+        texto_input = fuente_input.render(texto_render, True, (255, 255, 255))
+        self.pantalla.blit(texto_input, (rect_input.x + 10, rect_input.y + 10))
+        
+        # Botones de la mini ventana
+        self.btn_dialogo_cancelar = pygame.Rect(x + 30, y + 135, 140, 40)
+        self.btn_dialogo_guardar = pygame.Rect(x + 230, y + 135, 140, 40)
+        
+        pygame.draw.rect(self.pantalla, (180, 60, 60), self.btn_dialogo_cancelar, border_radius=5)
+        pygame.draw.rect(self.pantalla, (60, 160, 80), self.btn_dialogo_guardar, border_radius=5)
+        
+        texto_cancelar = fuente_input.render("Cancelar", True, (255, 255, 255))
+        texto_guardar = fuente_input.render("Guardar", True, (255, 255, 255))
+        
+        self.pantalla.blit(texto_cancelar, texto_cancelar.get_rect(center=self.btn_dialogo_cancelar.center))
+        self.pantalla.blit(texto_guardar, texto_guardar.get_rect(center=self.btn_dialogo_guardar.center))
 
     def _manejar_click_barra(self, posicion: tuple[int, int]) -> None:
         """Gestiona los clicks dentro de la barra de herramientas."""
@@ -335,7 +489,6 @@ class LevelEditor:
             if boton["rect"].collidepoint(posicion):
                 boton["accion"]()
                 return
-
 
 def principal() -> None:
     """Lanza el editor de niveles."""
