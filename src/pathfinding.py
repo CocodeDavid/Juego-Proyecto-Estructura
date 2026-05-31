@@ -15,43 +15,29 @@ def dfs(
     inicio: tuple[int, int],
     destino: tuple[int, int],
 ) -> list[tuple[int, int]]:
-    """Calcula una ruta usando Búsqueda en Profundidad (DFS)."""
+    """Calcula una ruta usando Búsqueda en Profundidad (DFS) de forma estable."""
     if not grafo.es_nodo_valido(inicio) or not grafo.es_nodo_valido(destino):
         return []
 
-    pila = [inicio]
-    # Usamos un set vacío inicial, no metemos 'inicio' todavía
+    # Guardamos en la pila una tupla: (nodo_actual, camino_hasta_este_nodo)
+    pila = [(inicio, [])]
     visitados = set()
-    viene_de: dict[tuple[int, int], tuple[int, int] | None] = {inicio: None}
 
     while pila:
-        actual = pila.pop()
+        actual, camino = pila.pop()
 
         if actual == destino:
-            break
+            return camino  # Retorna la ruta directa encontrada
 
-        # Solo lo marcamos como visitado al sacarlo de la pila
         if actual not in visitados:
             visitados.add(actual)
 
             for vecino in grafo.obtener_vecinos(actual):
                 if vecino not in visitados:
-                    # Sobrescribimos quién lo descubrió al último que profundizó
-                    viene_de[vecino] = actual
-                    pila.append(vecino)
+                    # Clonamos el camino actual y le sumamos el vecino
+                    pila.append((vecino, camino + [vecino]))
 
-    if destino not in viene_de:
-        return []
-
-    # Reconstrucción del camino
-    camino: list[tuple[int, int]] = []
-    nodo = destino
-    while nodo is not None and nodo != inicio:
-        camino.append(nodo)
-        nodo = viene_de.get(nodo)
-    
-    camino.reverse()
-    return camino
+    return []
 
 
 def dijkstra(
