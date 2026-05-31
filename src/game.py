@@ -41,8 +41,8 @@ class Game:
         self.reloj = pygame.time.Clock()
         self.en_ejecucion = False
         
-        # Cargar el algoritmo guardado desde la configuración
-        self.algoritmo_enemigo = self._cargar_algoritmo_config()
+        # Cargar configuración (algoritmo y visualizar ruta)
+        self.algoritmo_enemigo, self.visualizar_recorrido = self._cargar_configuracion()
 
         # Atributos para los menús y estados
         self.pausado = False
@@ -50,17 +50,20 @@ class Game:
         self.menu_pausa = PauseMenu(self.pantalla)
         self.menu_game_over = GameOverMenu(self.pantalla)
 
-    def _cargar_algoritmo_config(self) -> str:
-        """Carga la configuración guardada del enemigo."""
+    def _cargar_configuracion(self) -> tuple[str, bool]:
+        """Carga la configuración guardada del enemigo y la visualización."""
         ruta = Path(__file__).resolve().parents[1] / "config.json"
+        algoritmo = "a_estrella"
+        visualizar = False
         if ruta.exists():
             try:
                 with open(ruta, "r", encoding="utf-8") as archivo:
                     datos = json.load(archivo)
-                    return datos.get("algoritmo_enemigo", "a_estrella")
+                    algoritmo = datos.get("algoritmo_enemigo", "a_estrella")
+                    visualizar = datos.get("visualizar_recorrido", False)
             except Exception:
                 pass
-        return "a_estrella"
+        return algoritmo, visualizar
 
     def reiniciar_nivel(self) -> None:
         """Reinicia la posición del jugador, los enemigos y los estados de juego."""
@@ -158,6 +161,27 @@ class Game:
             if distancia_x < (TAMANO_CELDA // 2) and distancia_y < (TAMANO_CELDA // 2):
                 self.game_over = True
 
+    def _dibujar_rutas_enemigos(self) -> None:
+        """Renderiza unos cuadros mostrando la ruta planificada por los enemigos."""
+        superficie = pygame.Surface(self.pantalla.get_size(), pygame.SRCALPHA)
+        color_ruta = (200, 70, 70, 100) # Rojo semitransparente
+        
+        for enemigo in self.enemigos:
+            if enemigo.ruta:
+                for nodo in enemigo.ruta:
+                    # Dibuja un cuadro pequeño en el centro de cada celda de la ruta
+                    rect = pygame.Rect(
+                        self.offset_x + nodo[1] * TAMANO_CELDA + TAMANO_CELDA // 4,
+                        nodo[0] * TAMANO_CELDA + TAMANO_CELDA // 4,
+                        TAMANO_CELDA // 2,
+                        TAMANO_CELDA // 2,
+                    )
+                    pygame.draw.rect(superficie, color_ruta, rect, border_radius=4)
+                    
+        self.pantalla.blit(superficie, (0, 0))
+
+
+
     def dibujar(self) -> None:
         """Dibuja la escena del juego en la ventana."""
         self.pantalla.fill(COLOR_FONDO)
@@ -170,6 +194,8 @@ class Game:
             
         if self.modo_debug:
             self._dibujar_debug_bfs()
+            if self.visualizar_recorrido:
+                self._dibujar_rutas_enemigos()
             
         # Dibujar interfaces por encima del juego
         if self.game_over:
