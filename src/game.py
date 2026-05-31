@@ -1,6 +1,8 @@
 """Bucle de juego y coordinación de alto nivel."""
 
+import json
 import sys
+from pathlib import Path
 
 import pygame
 
@@ -14,6 +16,7 @@ from settings import (
     MODO_DEBUG,
     TAMANO_CELDA,
     TITULO_VENTANA,
+    CELDA_APARICION_ENEMIGO,
 )
 from src.enemy import Enemy
 from src.game_over import GameOverMenu
@@ -38,16 +41,37 @@ class Game:
         self.reloj = pygame.time.Clock()
         self.en_ejecucion = False
         
-        # Atributos para los menús
+        # Cargar el algoritmo guardado desde la configuración
+        self.algoritmo_enemigo = self._cargar_algoritmo_config()
+
+        # Atributos para los menús y estados
         self.pausado = False
         self.game_over = False
         self.menu_pausa = PauseMenu(self.pantalla)
         self.menu_game_over = GameOverMenu(self.pantalla)
 
+    def _cargar_algoritmo_config(self) -> str:
+        """Carga la configuración guardada del enemigo."""
+        ruta = Path(__file__).resolve().parents[1] / "config.json"
+        if ruta.exists():
+            try:
+                with open(ruta, "r", encoding="utf-8") as archivo:
+                    datos = json.load(archivo)
+                    return datos.get("algoritmo_enemigo", "a_estrella")
+            except Exception:
+                pass
+        return "a_estrella"
+
     def reiniciar_nivel(self) -> None:
         """Reinicia la posición del jugador, los enemigos y los estados de juego."""
         self.jugador = Jugador(self.cuadricula.spawn_jugador)
-        self.enemigos = [Enemy(f, c) for f, c in self.cuadricula.spawns_enemigos]
+        self.enemigos = []
+        # Escanear mapa para reubicar enemigos
+        for fila in range(self.cuadricula.filas):
+            for columna in range(self.cuadricula.columnas):
+                if self.cuadricula.celdas[fila][columna] == CELDA_APARICION_ENEMIGO:
+                    self.enemigos.append(Enemy(fila, columna))
+                    
         self.pausado = False
         self.game_over = False
 
@@ -76,7 +100,7 @@ class Game:
                 if self.game_over:
                     continue
                     
-                if evento.key == pygame.K_ESCAPE:
+                if evento.key == pygame.K_ESCAPE or evento.key == pygame.K_p:
                     self.pausado = not self.pausado
                 elif evento.key == pygame.K_F1:
                     self.modo_debug = not self.modo_debug
@@ -107,7 +131,7 @@ class Game:
                         pygame.quit()
                         sys.exit()
                         
-                # 3. Gestionar clicks en el juego
+                # 3. Gestionar clicks en el juego (Movimiento)
                 else:
                     self.jugador.establecer_destino_click(
                         evento.pos,
@@ -124,10 +148,14 @@ class Game:
         self.jugador.actualizar()
         for enemigo in self.enemigos:
             enemigo.actualizar(
-                self.cuadricula, (self.jugador.fila, self.jugador.columna)
+                self.cuadricula, 
+                (self.jugador.fila, self.jugador.columna),
+                self.algoritmo_enemigo
             )
-            # Evaluar colisiones de derrota
-            if enemigo.fila == self.jugador.fila and enemigo.columna == self.jugador.columna:
+            # Evaluar colisiones de derrota (Si están a menos de media celda)
+            distancia_x = abs(self.jugador.x - enemigo.x)
+            distancia_y = abs(self.jugador.y - enemigo.y)
+            if distancia_x < (TAMANO_CELDA // 2) and distancia_y < (TAMANO_CELDA // 2):
                 self.game_over = True
 
     def dibujar(self) -> None:
@@ -136,6 +164,7 @@ class Game:
         self.cuadricula.dibujar(self.pantalla, offset_x=self.offset_x)
         self.jugador.dibujar(self.pantalla, offset_x=self.offset_x)
         
+        # Dibujar los enemigos actuales en pantalla
         for enemigo in self.enemigos:
             enemigo.dibujar(self.pantalla, offset_x=self.offset_x)
             
@@ -151,7 +180,7 @@ class Game:
         pygame.display.flip()
 
     def _dibujar_debug_bfs(self) -> None:
-        # (El código del debug_bfs se mantiene igual)
+        """Dibuja los nodos visitados y la ruta BFS."""
         superficie = pygame.Surface(self.pantalla.get_size(), pygame.SRCALPHA)
         color_visitados = (60, 120, 200, 120)
         color_ruta = (250, 250, 60, 200)

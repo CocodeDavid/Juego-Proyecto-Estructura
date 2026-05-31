@@ -19,6 +19,9 @@ TIPO_ENEMIGO_BASICO = "basic"
 APARICION_JUGADOR_POR_DEFECTO = (3, 3)
 APARICION_ENEMIGO_POR_DEFECTO = (10, 10)
 
+# Lista de algoritmos actualizados según tu requerimiento
+ALGORITMOS_DISPONIBLES = ["dfs", "dijkstra", "a_estrella"]
+
 TITULO_VENTANA = "Juego Estructuras de Datos"
 TITULO_EDITOR = "Editor de niveles"
 
