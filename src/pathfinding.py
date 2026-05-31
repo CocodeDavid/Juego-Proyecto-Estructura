@@ -20,7 +20,8 @@ def dfs(
         return []
 
     pila = [inicio]
-    visitados = {inicio}
+    # Usamos un set vacío inicial, no metemos 'inicio' todavía
+    visitados = set()
     viene_de: dict[tuple[int, int], tuple[int, int] | None] = {inicio: None}
 
     while pila:
@@ -29,11 +30,15 @@ def dfs(
         if actual == destino:
             break
 
-        for vecino in grafo.obtener_vecinos(actual):
-            if vecino not in visitados:
-                visitados.add(vecino)
-                viene_de[vecino] = actual
-                pila.append(vecino)
+        # Solo lo marcamos como visitado al sacarlo de la pila
+        if actual not in visitados:
+            visitados.add(actual)
+
+            for vecino in grafo.obtener_vecinos(actual):
+                if vecino not in visitados:
+                    # Sobrescribimos quién lo descubrió al último que profundizó
+                    viene_de[vecino] = actual
+                    pila.append(vecino)
 
     if destino not in viene_de:
         return []
@@ -43,7 +48,8 @@ def dfs(
     nodo = destino
     while nodo is not None and nodo != inicio:
         camino.append(nodo)
-        nodo = viene_de[nodo]
+        nodo = viene_de.get(nodo)
+    
     camino.reverse()
     return camino
 

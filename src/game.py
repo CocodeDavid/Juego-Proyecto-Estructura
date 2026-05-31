@@ -162,23 +162,30 @@ class Game:
                 self.game_over = True
 
     def _dibujar_rutas_enemigos(self) -> None:
-        """Renderiza unos cuadros mostrando la ruta planificada por los enemigos."""
-        superficie = pygame.Surface(self.pantalla.get_size(), pygame.SRCALPHA)
-        color_ruta = (200, 70, 70, 100) # Rojo semitransparente
-        
+        """Dibuja una línea simple indicando el camino del enemigo hacia el jugador."""
         for enemigo in self.enemigos:
-            if enemigo.ruta:
-                for nodo in enemigo.ruta:
-                    # Dibuja un cuadro pequeño en el centro de cada celda de la ruta
-                    rect = pygame.Rect(
-                        self.offset_x + nodo[1] * TAMANO_CELDA + TAMANO_CELDA // 4,
-                        nodo[0] * TAMANO_CELDA + TAMANO_CELDA // 4,
-                        TAMANO_CELDA // 2,
-                        TAMANO_CELDA // 2,
-                    )
-                    pygame.draw.rect(superficie, color_ruta, rect, border_radius=4)
-                    
-        self.pantalla.blit(superficie, (0, 0))
+            if not enemigo.ruta:
+                continue
+            
+            # 1. Crear una lista de puntos (en coordenadas de píxeles)
+            puntos = []
+            
+            # El primer punto es el centro actual del enemigo
+            punto_inicial_x = enemigo.x + self.offset_x
+            punto_inicial_y = enemigo.y
+            puntos.append((punto_inicial_x, punto_inicial_y))
+            
+            # 2. Añadir los centros de todas las celdas de la ruta pendiente
+            for fila, columna in enemigo.ruta:
+                centro_x = (columna * TAMANO_CELDA) + (TAMANO_CELDA // 2) + self.offset_x
+                centro_y = (fila * TAMANO_CELDA) + (TAMANO_CELDA // 2)
+                puntos.append((centro_x, centro_y))
+                
+            # 3. Dibujar la línea (solo si hay al menos 2 puntos)
+            if len(puntos) >= 2:
+                # Dibuja líneas continuas. False indica que no se debe cerrar el polígono.
+                # El "3" al final es el grosor de la línea.
+                pygame.draw.lines(self.pantalla, enemigo.color, False, puntos, 3)
 
 
 
@@ -194,8 +201,9 @@ class Game:
             
         if self.modo_debug:
             self._dibujar_debug_bfs()
-            if self.visualizar_recorrido:
-                self._dibujar_rutas_enemigos()
+            
+        if self.visualizar_recorrido:
+            self._dibujar_rutas_enemigos()
             
         # Dibujar interfaces por encima del juego
         if self.game_over:
