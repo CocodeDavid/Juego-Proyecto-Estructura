@@ -41,8 +41,8 @@ class Game:
         self.reloj = pygame.time.Clock()
         self.en_ejecucion = False
         
-        # Cargar el algoritmo guardado desde la configuración
-        self.algoritmo_enemigo = self._cargar_algoritmo_config()
+        # Cargar configuración (algoritmo y visualizar ruta)
+        self.algoritmo_enemigo, self.visualizar_recorrido = self._cargar_configuracion()
 
         # Atributos para los menús y estados
         self.pausado = False
@@ -50,17 +50,20 @@ class Game:
         self.menu_pausa = PauseMenu(self.pantalla)
         self.menu_game_over = GameOverMenu(self.pantalla)
 
-    def _cargar_algoritmo_config(self) -> str:
-        """Carga la configuración guardada del enemigo."""
+    def _cargar_configuracion(self) -> tuple[str, bool]:
+        """Carga la configuración guardada del enemigo y la visualización."""
         ruta = Path(__file__).resolve().parents[1] / "config.json"
+        algoritmo = "a_estrella"
+        visualizar = False
         if ruta.exists():
             try:
                 with open(ruta, "r", encoding="utf-8") as archivo:
                     datos = json.load(archivo)
-                    return datos.get("algoritmo_enemigo", "a_estrella")
+                    algoritmo = datos.get("algoritmo_enemigo", "a_estrella")
+                    visualizar = datos.get("visualizar_recorrido", False)
             except Exception:
                 pass
-        return "a_estrella"
+        return algoritmo, visualizar
 
     def reiniciar_nivel(self) -> None:
         """Reinicia la posición del jugador, los enemigos y los estados de juego."""
@@ -158,6 +161,34 @@ class Game:
             if distancia_x < (TAMANO_CELDA // 2) and distancia_y < (TAMANO_CELDA // 2):
                 self.game_over = True
 
+    def _dibujar_rutas_enemigos(self) -> None:
+        """Dibuja una línea simple indicando el camino del enemigo hacia el jugador."""
+        for enemigo in self.enemigos:
+            if not enemigo.ruta:
+                continue
+            
+            # 1. Crear una lista de puntos (en coordenadas de píxeles)
+            puntos = []
+            
+            # El primer punto es el centro actual del enemigo
+            punto_inicial_x = enemigo.x + self.offset_x
+            punto_inicial_y = enemigo.y
+            puntos.append((punto_inicial_x, punto_inicial_y))
+            
+            # 2. Añadir los centros de todas las celdas de la ruta pendiente
+            for fila, columna in enemigo.ruta:
+                centro_x = (columna * TAMANO_CELDA) + (TAMANO_CELDA // 2) + self.offset_x
+                centro_y = (fila * TAMANO_CELDA) + (TAMANO_CELDA // 2)
+                puntos.append((centro_x, centro_y))
+                
+            # 3. Dibujar la línea (solo si hay al menos 2 puntos)
+            if len(puntos) >= 2:
+                # Dibuja líneas continuas. False indica que no se debe cerrar el polígono.
+                # El "3" al final es el grosor de la línea.
+                pygame.draw.lines(self.pantalla, enemigo.color, False, puntos, 3)
+
+
+
     def dibujar(self) -> None:
         """Dibuja la escena del juego en la ventana."""
         self.pantalla.fill(COLOR_FONDO)
@@ -170,6 +201,9 @@ class Game:
             
         if self.modo_debug:
             self._dibujar_debug_bfs()
+            
+        if self.visualizar_recorrido:
+            self._dibujar_rutas_enemigos()
             
         # Dibujar interfaces por encima del juego
         if self.game_over:

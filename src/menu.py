@@ -57,7 +57,9 @@ class Menu:
 
         self.ruta_base = Path(__file__).resolve().parents[1]
         self.ruta_configuracion = self.ruta_base / "config.json"
-        self.algoritmo_enemigo = self._cargar_configuracion()
+        config = self._cargar_configuracion()
+        self.algoritmo_enemigo = config.get("algoritmo_enemigo", "a_estrella")
+        self.visualizar_recorrido = config.get("visualizar_recorrido", False)
 
         self.niveles: list[dict[str, object]] = []
         self.desplazamiento_niveles = 0
@@ -124,10 +126,18 @@ class Menu:
         if evento.type != pygame.MOUSEBUTTONDOWN or evento.button != 1:
             return
 
+        # Comprobar click en algoritmos
         for opcion in self._obtener_opciones_algoritmo():
             if opcion["rect"].collidepoint(evento.pos):
                 self._establecer_algoritmo(opcion["valor"])
                 return
+                
+        # NUEVO: Comprobar click en el checkbox de visualizar
+        rect_visualizar = self._obtener_rect_checkbox_visualizar()
+        if rect_visualizar.collidepoint(evento.pos):
+            self.visualizar_recorrido = not self.visualizar_recorrido
+            self._guardar_configuracion_actual()
+            return
 
         boton_volver = self._obtener_boton_volver()
         if boton_volver["rect"].collidepoint(evento.pos):
@@ -168,9 +178,7 @@ class Menu:
         rect_subtitulo = subtitulo.get_rect(
             midtop=(
                 ANCHO // 2,
-                MARGEN_SUPERIOR_TITULO_MENU
-                + TAMANO_FUENTE_TITULO_MENU
-                + ESPACIADO_BOTONES_MENU,
+                MARGEN_SUPERIOR_TITULO_MENU + TAMANO_FUENTE_TITULO_MENU + ESPACIADO_BOTONES_MENU,
             )
         )
         self.pantalla.blit(subtitulo, rect_subtitulo)
@@ -180,6 +188,10 @@ class Menu:
             self._dibujar_opcion_algoritmo(
                 opcion["rect"], opcion["texto"], seleccionado
             )
+            
+        # NUEVO: Dibujar checkbox de visualización
+        rect_visualizar = self._obtener_rect_checkbox_visualizar()
+        self._dibujar_checkbox(rect_visualizar, "Visualizar recorrido enemigos", self.visualizar_recorrido)
 
         boton_volver = self._obtener_boton_volver()
         self._dibujar_boton(boton_volver["rect"], boton_volver["texto"], False)
@@ -300,24 +312,68 @@ class Menu:
         return {"texto": "Volver", "rect": rect}
 
     def _obtener_opciones_algoritmo(self) -> list[dict[str, object]]:
-        """Devuelve las opciones del algoritmo de búsqueda."""
+        """Devuelve las opciones del algoritmo de búsqueda actualizado."""
         opciones = [
-            {"texto": "A* (A-estrella)", "valor": "astar"},
-            {"texto": "BFS (Búsqueda en anchura)", "valor": "bfs"},
-            {"texto": "Patrulla aleatoria", "valor": "patrulla"},
+            {"texto": "A* (A estrella)", "valor": "a_estrella"},
+            {"texto": "DFS (Búsqueda en profundidad)", "valor": "dfs"},
+            {"texto": "Dijkstra", "valor": "dijkstra"},
         ]
         lista: list[dict[str, object]] = []
         inicio_y = MARGEN_SUPERIOR_LISTA_MENU
         for indice, opcion in enumerate(opciones):
             y = inicio_y + indice * (ALTO_BOTON_MENU + ESPACIADO_ALGORITMOS_MENU)
-            rect = pygame.Rect(
-                (ANCHO - ANCHO_BOTON_MENU) // 2,
-                y,
-                ANCHO_BOTON_MENU,
-                ALTO_BOTON_MENU,
-            )
+            rect = pygame.Rect((ANCHO - ANCHO_BOTON_MENU) // 2, y, ANCHO_BOTON_MENU, ALTO_BOTON_MENU)
             lista.append({"texto": opcion["texto"], "valor": opcion["valor"], "rect": rect})
         return lista
+
+    
+    def _obtener_rect_checkbox_visualizar(self) -> pygame.Rect:
+        """Obtiene la posición para el botón de visualizar recorrido."""
+        opciones = self._obtener_opciones_algoritmo()
+        y = opciones[-1]["rect"].bottom + ESPACIADO_ALGORITMOS_MENU * 2
+        return pygame.Rect((ANCHO - ANCHO_BOTON_MENU) // 2, y, ANCHO_BOTON_MENU, ALTO_BOTON_MENU)
+
+    def _dibujar_checkbox(
+        self, rectangulo: pygame.Rect, texto: str, seleccionado: bool
+    ) -> None:
+        """Dibuja una opción de casilla de verificación (checkbox)."""
+        posicion_mouse = pygame.mouse.get_pos()
+        hover = rectangulo.collidepoint(posicion_mouse)
+        color = COLOR_BOTON_HOVER if hover else COLOR_BOTON
+            
+        pygame.draw.rect(self.pantalla, color, rectangulo, border_radius=RADIO_BOTON_MENU)
+
+        lado_checkbox = 20
+        rect_cuadro = pygame.Rect(
+            rectangulo.left + MARGEN_SELECTOR_ALGORITMO,
+            rectangulo.centery - lado_checkbox // 2,
+            lado_checkbox,
+            lado_checkbox
+        )
+        pygame.draw.rect(self.pantalla, COLOR_TEXTO, rect_cuadro, ANCHO_BORDE_SELECTOR, border_radius=4)
+        
+        if seleccionado:
+            rect_relleno = rect_cuadro.inflate(-8, -8)
+            pygame.draw.rect(self.pantalla, COLOR_TEXTO, rect_relleno, border_radius=2)
+
+        superficie = self.fuente_boton.render(texto, True, COLOR_TEXTO)
+        rect_texto = superficie.get_rect()
+        rect_texto.midleft = (
+            rect_cuadro.right + ESPACIADO_TEXTO_SELECTOR,
+            rectangulo.centery,
+        )
+        self.pantalla.blit(superficie, rect_texto)
+
+
+
+
+
+
+
+
+
+
+
 
     def _cargar_niveles(self) -> None:
         """Carga los niveles disponibles desde la carpeta levels."""
@@ -380,10 +436,11 @@ class Menu:
 
     def _establecer_algoritmo(self, algoritmo: str) -> None:
         """Actualiza el algoritmo seleccionado y lo guarda en disco."""
-        if algoritmo not in ALGORITMOS_DISPONIBLES:
+        permitidos = ["a_estrella", "dfs", "dijkstra"]
+        if algoritmo not in permitidos:
             return
         self.algoritmo_enemigo = algoritmo
-        self._guardar_configuracion(algoritmo)
+        self._guardar_configuracion_actual()
 
     def _iniciar_juego(self, nivel: dict[str, object]) -> None:
         """Carga el nivel seleccionado e inicia el juego."""
@@ -416,29 +473,30 @@ class Menu:
         self.fuente_titulo = pygame.font.SysFont(None, TAMANO_FUENTE_TITULO_MENU)
         self.fuente_boton = pygame.font.SysFont(None, TAMANO_FUENTE_BOTON_MENU)
 
-    def _cargar_configuracion(self) -> str:
-        """Carga la configuración del algoritmo desde disco."""
-        algoritmo = ALGORITMOS_DISPONIBLES[0]
+    def _cargar_configuracion(self) -> dict:
+        """Carga la configuración completa desde el archivo json."""
+        config_default = {"algoritmo_enemigo": "a_estrella", "visualizar_recorrido": False}
         if self.ruta_configuracion.exists():
             try:
                 with open(self.ruta_configuracion, "r", encoding="utf-8") as archivo:
                     datos = json.load(archivo)
-                algoritmo = str(datos.get("algoritmo_enemigo", algoritmo))
-            except (OSError, json.JSONDecodeError, AttributeError):
-                algoritmo = ALGORITMOS_DISPONIBLES[0]
-        if algoritmo not in ALGORITMOS_DISPONIBLES:
-            algoritmo = ALGORITMOS_DISPONIBLES[0]
-        self._guardar_configuracion(algoritmo)
-        return algoritmo
+                    config_default["algoritmo_enemigo"] = datos.get("algoritmo_enemigo", "a_estrella")
+                    config_default["visualizar_recorrido"] = datos.get("visualizar_recorrido", False)
+            except Exception:
+                pass
+        return config_default
 
-    def _guardar_configuracion(self, algoritmo: str) -> None:
+    def _guardar_configuracion_actual(self) -> None:
         """Guarda la configuración actual en config.json."""
-        datos = {"algoritmo_enemigo": algoritmo}
+        datos = {
+            "algoritmo_enemigo": self.algoritmo_enemigo,
+            "visualizar_recorrido": self.visualizar_recorrido
+        }
         try:
             with open(self.ruta_configuracion, "w", encoding="utf-8") as archivo:
                 json.dump(datos, archivo, ensure_ascii=False)
         except OSError:
-            return
+            pass
 
     def _salir(self) -> None:
         """Cierra la aplicación por completo."""
