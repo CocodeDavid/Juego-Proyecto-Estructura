@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 
-from settings import CELDA_MURO
+from settings import CELDA_MURO, CELDA_SUELO, TILE_META
 
 
 class Grafo:
@@ -25,7 +25,10 @@ class Grafo:
         self.lista_adyacencia = {}
         for fila in range(grilla.filas):
             for columna in range(grilla.columnas):
-                if grilla.celdas[fila][columna] == CELDA_MURO:
+                valor = grilla.celdas[fila][columna]
+                if valor == TILE_META:
+                    valor = CELDA_SUELO
+                if valor == CELDA_MURO:
                     continue
                 nodo = (fila, columna)
                 vecinos: list[tuple[int, int]] = []
@@ -35,9 +38,12 @@ class Grafo:
                     if (
                         0 <= nueva_fila < grilla.filas
                         and 0 <= nueva_columna < grilla.columnas
-                        and grilla.celdas[nueva_fila][nueva_columna] != CELDA_MURO
                     ):
-                        vecinos.append((nueva_fila, nueva_columna))
+                        valor_vecino = grilla.celdas[nueva_fila][nueva_columna]
+                        if valor_vecino == TILE_META:
+                            valor_vecino = CELDA_SUELO
+                        if valor_vecino != CELDA_MURO:
+                            vecinos.append((nueva_fila, nueva_columna))
                 self.lista_adyacencia[nodo] = vecinos
 
     def obtener_vecinos(self, nodo: tuple[int, int]) -> list[tuple[int, int]]:

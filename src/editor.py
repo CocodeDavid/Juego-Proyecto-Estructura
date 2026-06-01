@@ -14,6 +14,7 @@ from settings import (
     CELDA_APARICION_JUGADOR,
     CELDA_MURO,
     CELDA_SUELO,
+    COLOR_META,
     COLOR_APARICION_ENEMIGO,
     COLOR_APARICION_JUGADOR,
     COLOR_FONDO,
@@ -24,6 +25,7 @@ from settings import (
     FILAS,
     FOTOGRAMAS_POR_SEGUNDO,
     TAMANO_CELDA,
+    TILE_META,
     TIPO_ENEMIGO_BASICO,
     TITULO_EDITOR,
     TITULO_VENTANA,
@@ -79,6 +81,11 @@ class LevelEditor:
                 "nombre": "Spawn Enemigo",
                 "color": (180, 60, 60),
             },
+            {
+                "valor": TILE_META,
+                "nombre": "Meta",
+                "color": COLOR_META,
+            },
         ]
         
         self.aparicion_jugador = {
@@ -97,6 +104,10 @@ class LevelEditor:
         self.nombre_nivel_input = ""
         self.btn_dialogo_guardar = pygame.Rect(0, 0, 0, 0)
         self.btn_dialogo_cancelar = pygame.Rect(0, 0, 0, 0)
+        self.mensaje_barra = ""
+        self.color_mensaje_barra = (200, 60, 60)
+        self.tiempo_mensaje_barra = 0
+        self.duracion_mensaje_barra = 2000
 
     def ejecutar(self) -> None:
         """Ejecuta la pantalla del editor."""
@@ -177,6 +188,15 @@ class LevelEditor:
 
     def _pintar_celda(self, fila: int, columna: int) -> None:
         """Pinta la baldosa seleccionada en la cuadrícula."""
+        if self.baldosa_seleccionada == TILE_META:
+            cantidad_meta = self._contar_baldosas(TILE_META)
+            if (
+                cantidad_meta >= 1
+                and self.cuadricula.celdas[fila][columna] != TILE_META
+            ):
+                self.mensaje_barra = "Solo una meta por nivel"
+                self.tiempo_mensaje_barra = pygame.time.get_ticks()
+                return
         if self.baldosa_seleccionada == CELDA_APARICION_JUGADOR:
             self._establecer_celda(
                 self.aparicion_jugador["fila"],
@@ -184,6 +204,7 @@ class LevelEditor:
                 CELDA_SUELO,
             )
             self.aparicion_jugador = {"fila": fila, "columna": columna}
+        self.mensaje_barra = ""
         self._establecer_celda(fila, columna, self.baldosa_seleccionada)
 
     def _borrar_celda(self, fila: int, columna: int) -> None:
@@ -220,13 +241,15 @@ class LevelEditor:
             self.aparicion_jugador["columna"],
             CELDA_APARICION_JUGADOR,
         )
+        self.mensaje_barra = ""
 
     def _buscar_apariciones(
         self,
-    ) -> tuple[dict[str, int], list[dict[str, int | str]]]:
+    ) -> tuple[dict[str, int], list[dict[str, int | str]], dict[str, int] | None]:
         """Escanea la cuadrícula para localizar apariciones."""
         aparicion_jugador = self.aparicion_jugador
         apariciones_enemigo: list[dict[str, int | str]] = []
+        meta: dict[str, int] | None = None
         for fila in range(self.cuadricula.filas):
             for columna in range(self.cuadricula.columnas):
                 baldosa = self.cuadricula.celdas[fila][columna]
@@ -236,7 +259,9 @@ class LevelEditor:
                     apariciones_enemigo.append(
                         {"fila": fila, "columna": columna, "tipo": TIPO_ENEMIGO_BASICO}
                     )
-        return aparicion_jugador, apariciones_enemigo
+                elif baldosa == TILE_META:
+                    meta = {"fila": fila, "columna": columna}
+        return aparicion_jugador, apariciones_enemigo, meta
 
     def _dibujar(self) -> None:
         """Dibuja la cuadrícula y las baldosas del editor."""
@@ -251,6 +276,8 @@ class LevelEditor:
                     color = COLOR_APARICION_JUGADOR
                 elif baldosa == CELDA_APARICION_ENEMIGO:
                     color = COLOR_APARICION_ENEMIGO
+                elif baldosa == TILE_META:
+                    color = COLOR_META
                 else:
                     color = COLOR_SUELO
                     
@@ -295,16 +322,21 @@ class LevelEditor:
         ruta_niveles.mkdir(exist_ok=True)
         ruta_completa = ruta_niveles / nombre_archivo
 
-        aparicion_jugador, apariciones_enemigo = self._buscar_apariciones()
+        aparicion_jugador, apariciones_enemigo, meta = self._buscar_apariciones()
+        baldosas = [fila.copy() for fila in self.cuadricula.celdas]
+        if meta:
+            baldosas[meta["fila"]][meta["columna"]] = CELDA_SUELO
         
         datos_nivel = {
             "name": nombre_original,
             "rows": self.cuadricula.filas,
             "cols": self.cuadricula.columnas,
-            "tiles": self.cuadricula.celdas,
+            "tiles": baldosas,
             "player_spawn": aparicion_jugador,
             "enemy_spawns": apariciones_enemigo,
         }
+        if meta:
+            datos_nivel["meta"] = meta
         
         # Guardado en disco
         with open(ruta_completa, "w", encoding="utf-8") as archivo:
@@ -424,6 +456,27 @@ class LevelEditor:
             )
             self.pantalla.blit(texto, rect_texto)
 
+        if self.mensaje_barra:
+            tiempo_actual = pygame.time.get_ticks()
+            if tiempo_actual - self.tiempo_mensaje_barra > self.duracion_mensaje_barra:
+                self.mensaje_barra = ""
+            else:
+                alto_titulo = titulo.get_rect().height
+                inicio_y = alto_titulo + MARGEN_SUPERIOR_BARRA + 16
+                y_mensaje = (
+                    inicio_y
+                    + len(self.materiales)
+                    * (ALTO_BOTON_MATERIAL + ESPACIADO_BOTONES_MATERIAL)
+                    + 6
+                )
+                texto_mensaje = self.fuente_barra.render(
+                    self.mensaje_barra, True, self.color_mensaje_barra
+                )
+                rect_mensaje = texto_mensaje.get_rect(
+                    midtop=(self.ancho_barra_herramientas // 2, y_mensaje)
+                )
+                self.pantalla.blit(texto_mensaje, rect_mensaje)
+
         for boton in self._obtener_botones_accion():
             rect = boton["rect"]
             pygame.draw.rect(self.pantalla, boton["color"], rect, border_radius=4)
@@ -484,11 +537,21 @@ class LevelEditor:
         for boton in self._obtener_botones_materiales():
             if boton["rect"].collidepoint(posicion):
                 self.baldosa_seleccionada = int(boton["valor"])
+                self.mensaje_barra = ""
                 return
         for boton in self._obtener_botones_accion():
             if boton["rect"].collidepoint(posicion):
                 boton["accion"]()
                 return
+
+    def _contar_baldosas(self, valor_objetivo: int) -> int:
+        """Cuenta cuántas baldosas hay con un valor específico."""
+        cantidad = 0
+        for fila in self.cuadricula.celdas:
+            for valor in fila:
+                if valor == valor_objetivo:
+                    cantidad += 1
+        return cantidad
 
 def principal() -> None:
     """Lanza el editor de niveles."""
