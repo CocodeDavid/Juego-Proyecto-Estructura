@@ -10,6 +10,8 @@ from settings import (
     CELDA_APARICION_JUGADOR,
     CELDA_MURO,
     CELDA_SUELO,
+    COLOR_META,
+    TILE_META,
 )
 from src.grafo import Grafo
 
@@ -25,6 +27,7 @@ class Grid:
         self.celdas = [[CELDA_SUELO for _ in range(columnas)] for _ in range(filas)]
         self.spawn_jugador = APARICION_JUGADOR_POR_DEFECTO
         self.spawns_enemigos: list[tuple[int, int]] = [] # <--- NUEVO
+        self.spawn_meta: tuple[int, int] | None = None
         self.grafo = Grafo()
         self.grafo.construir_desde_grilla(self)
 
@@ -63,6 +66,10 @@ class Grid:
         self.celdas = baldosas
         self.spawn_jugador = self._leer_spawn_jugador(datos)
         self.spawns_enemigos = self._leer_spawns_enemigos(datos) # <--- AÑADIR ESTO
+        self.spawn_meta = self._leer_spawn_meta(datos)
+        if self.spawn_meta:
+            fila_meta, columna_meta = self.spawn_meta
+            self.celdas[fila_meta][columna_meta] = CELDA_SUELO
         # self.celdas es la representación visual, self.grafo es la estructura para búsquedas.
         self.grafo = Grafo()
         self.grafo.construir_desde_grilla(self)
@@ -91,6 +98,20 @@ class Grid:
                     if 0 <= fila < self.filas and 0 <= columna < self.columnas:
                         spawns.append((fila, columna))
         return spawns
+
+    def _leer_spawn_meta(self, datos: dict) -> tuple[int, int] | None:
+        """Obtiene la posición de la meta desde el JSON."""
+        meta = datos.get("meta")
+        if not isinstance(meta, dict):
+            return None
+        try:
+            fila = int(meta.get("fila", -1))
+            columna = int(meta.get("columna", -1))
+        except (TypeError, ValueError):
+            return None
+        if 0 <= fila < self.filas and 0 <= columna < self.columnas:
+            return (fila, columna)
+        return None
 
     def _validar_baldosas(self, baldosas: object) -> bool:
         """Valida la estructura y el contenido de las baldosas cargadas."""
@@ -128,11 +149,17 @@ class Grid:
             CELDA_MURO: (110, 110, 110),
             CELDA_APARICION_JUGADOR: (40, 120, 220),
             CELDA_APARICION_ENEMIGO: (200, 70, 70),
+            TILE_META: COLOR_META,
         }
         for fila in range(self.filas):
             for columna in range(self.columnas):
                 valor = self.celdas[fila][columna]
-                color = colores.get(valor, colores[CELDA_SUELO])
+                es_meta = False
+                if self.spawn_meta and (fila, columna) == self.spawn_meta:
+                    es_meta = True
+                elif valor == TILE_META:
+                    es_meta = True
+                color = COLOR_META if es_meta else colores.get(valor, colores[CELDA_SUELO])
                 rectangulo = pygame.Rect(
                     offset_x + columna * self.tamano_celda,
                     fila * self.tamano_celda,
@@ -140,6 +167,8 @@ class Grid:
                     self.tamano_celda,
                 )
                 pygame.draw.rect(pantalla, color, rectangulo)
+                if es_meta:
+                    pygame.draw.rect(pantalla, (255, 255, 255), rectangulo, 2)
 
     def es_transitable(self, fila: int, columna: int) -> bool:
         """Devuelve True si la celda está dentro de los límites y no es muro."""
