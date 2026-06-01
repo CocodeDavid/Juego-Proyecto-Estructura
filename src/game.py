@@ -40,6 +40,8 @@ class Game:
         pygame.display.set_caption(TITULO_VENTANA)
         self.reloj = pygame.time.Clock()
         self.en_ejecucion = False
+        self.estado = "jugando"
+        self.ruta_nivel_actual: str | None = None
         
         # Cargar configuración (algoritmo y visualizar ruta)
         self.algoritmo_enemigo, self.visualizar_recorrido = self._cargar_configuracion()
@@ -49,6 +51,13 @@ class Game:
         self.game_over = False
         self.menu_pausa = PauseMenu(self.pantalla)
         self.menu_game_over = GameOverMenu(self.pantalla)
+        self.fuente_ganaste_titulo = pygame.font.SysFont(None, 64)
+        self.fuente_ganaste_boton = pygame.font.SysFont(None, 40)
+        self.botones_ganaste = [
+            {"texto": "Volver a jugar", "accion": "reiniciar", "color": (50, 160, 80), "rect": pygame.Rect(0, 0, 0, 0)},
+            {"texto": "Volver al menú", "accion": "menu", "color": (200, 150, 40), "rect": pygame.Rect(0, 0, 0, 0)},
+            {"texto": "Salir", "accion": "salir", "color": (200, 60, 60), "rect": pygame.Rect(0, 0, 0, 0)},
+        ]
 
     def _cargar_configuracion(self) -> tuple[str, bool]:
         """Carga la configuración guardada del enemigo y la visualización."""
@@ -77,9 +86,11 @@ class Game:
                     
         self.pausado = False
         self.game_over = False
+        self.estado = "jugando"
 
     def cargar_nivel(self, ruta: str) -> None:
         """Carga un nivel y reposiciona entidades."""
+        self.ruta_nivel_actual = ruta
         self.cuadricula.cargar_desde_json(ruta)
         self.reiniciar_nivel()
 
@@ -100,7 +111,7 @@ class Game:
                 
             elif evento.type == pygame.KEYDOWN:
                 # Si el jugador perdió, no permitimos que oprima atajos
-                if self.game_over:
+                if self.game_over or self.estado == "ganaste":
                     continue
                     
                 if evento.key == pygame.K_ESCAPE or evento.key == pygame.K_p:
@@ -113,7 +124,19 @@ class Game:
                     
             elif evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
                 # 1. Gestionar clicks en la pantalla Game Over
-                if self.game_over:
+                if self.estado == "ganaste":
+                    accion = self._manejar_click_ganaste(evento.pos)
+                    if accion == "reiniciar":
+                        if self.ruta_nivel_actual:
+                            self.cargar_nivel(self.ruta_nivel_actual)
+                        else:
+                            self.reiniciar_nivel()
+                    elif accion == "menu":
+                        self.en_ejecucion = False
+                    elif accion == "salir":
+                        pygame.quit()
+                        sys.exit()
+                elif self.game_over:
                     accion = self.menu_game_over.manejar_click(evento.pos)
                     if accion == "reiniciar":
                         self.reiniciar_nivel()
@@ -145,10 +168,16 @@ class Game:
     def actualizar(self) -> None:
         """Actualiza los objetos del juego en cada fotograma."""
         # Detener la lógica si está pausado o el jugador murió
-        if self.pausado or self.game_over:
+        if self.pausado or self.game_over or self.estado == "ganaste":
             return
             
         self.jugador.actualizar()
+        if (
+            self.cuadricula.spawn_meta
+            and (self.jugador.fila, self.jugador.columna) == self.cuadricula.spawn_meta
+        ):
+            self.estado = "ganaste"
+            return
         for enemigo in self.enemigos:
             enemigo.actualizar(
                 self.cuadricula, 
@@ -206,7 +235,9 @@ class Game:
             self._dibujar_rutas_enemigos()
             
         # Dibujar interfaces por encima del juego
-        if self.game_over:
+        if self.estado == "ganaste":
+            self._dibujar_pantalla_ganaste()
+        elif self.game_over:
             self.menu_game_over.dibujar()
         elif self.pausado:
             self.menu_pausa.dibujar()
@@ -238,3 +269,55 @@ class Game:
             pygame.draw.rect(superficie, color_ruta, rect)
 
         self.pantalla.blit(superficie, (0, 0))
+
+    def _dibujar_pantalla_ganaste(self) -> None:
+        """Dibuja la pantalla de victoria con botones interactivos."""
+        superficie = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+        superficie.fill((255, 220, 80, 160))
+        self.pantalla.blit(superficie, (0, 0))
+
+        texto = self.fuente_ganaste_titulo.render("¡Ganaste!", True, (80, 60, 10))
+        rect_texto = texto.get_rect()
+        ancho_boton = 260
+        alto_boton = 50
+        espaciado_boton = 12
+        alto_botones = alto_boton * 3 + espaciado_boton * 2
+        alto_grupo = rect_texto.height + 24 + alto_botones
+        inicio_y = (ALTO - alto_grupo) // 2
+        rect_texto.centerx = ANCHO // 2
+        rect_texto.top = inicio_y
+        self.pantalla.blit(texto, rect_texto)
+
+        x_botones = ANCHO // 2 - ancho_boton // 2
+        y_botones = rect_texto.bottom + 24
+        for indice, boton in enumerate(self.botones_ganaste):
+            rect_boton = pygame.Rect(
+                x_botones,
+                y_botones + indice * (alto_boton + espaciado_boton),
+                ancho_boton,
+                alto_boton,
+            )
+            boton["rect"] = rect_boton
+
+        posicion_mouse = pygame.mouse.get_pos()
+        for boton in self.botones_ganaste:
+            color_actual = boton["color"]
+            if boton["rect"].collidepoint(posicion_mouse):
+                color_actual = (
+                    min(color_actual[0] + 40, 255),
+                    min(color_actual[1] + 40, 255),
+                    min(color_actual[2] + 40, 255),
+                )
+            pygame.draw.rect(self.pantalla, color_actual, boton["rect"], border_radius=8)
+            texto_boton = self.fuente_ganaste_boton.render(
+                boton["texto"], True, (255, 255, 255)
+            )
+            rect_texto_boton = texto_boton.get_rect(center=boton["rect"].center)
+            self.pantalla.blit(texto_boton, rect_texto_boton)
+
+    def _manejar_click_ganaste(self, posicion: tuple[int, int]) -> str | None:
+        """Devuelve la acción del botón clickeado en la victoria."""
+        for boton in self.botones_ganaste:
+            if boton["rect"].collidepoint(posicion):
+                return str(boton["accion"])
+        return None

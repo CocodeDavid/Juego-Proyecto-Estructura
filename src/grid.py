@@ -48,6 +48,7 @@ class Grid:
             )
             self._rellenar_perimetro_muros()
             self.spawn_jugador = APARICION_JUGADOR_POR_DEFECTO
+            self.spawn_meta = None
             self.grafo = Grafo()
             self.grafo.construir_desde_grilla(self)
             return
@@ -60,6 +61,7 @@ class Grid:
             )
             self._rellenar_perimetro_muros()
             self.spawn_jugador = APARICION_JUGADOR_POR_DEFECTO
+            self.spawn_meta = None
             self.grafo = Grafo()
             self.grafo.construir_desde_grilla(self)
             return

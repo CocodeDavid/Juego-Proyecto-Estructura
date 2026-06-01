@@ -26,6 +26,10 @@
     "fila": 2,
     "columna": 2
   },
+  "meta": {
+    "fila": 15,
+    "columna": 12
+  },
   "enemy_spawns": [
     {
       "fila": 15,
