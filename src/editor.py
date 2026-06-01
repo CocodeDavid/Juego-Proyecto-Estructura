@@ -30,6 +30,8 @@ from settings import (
     TITULO_EDITOR,
     TITULO_VENTANA,
 )
+from src.busqueda import bfs
+from src.grafo import Grafo
 from src.grid import Grid
 
 ANCHO_BARRA_HERRAMIENTAS = 160
@@ -92,6 +94,11 @@ class LevelEditor:
             "fila": APARICION_JUGADOR_POR_DEFECTO[0],
             "columna": APARICION_JUGADOR_POR_DEFECTO[1],
         }
+        self.spawn_jugador = (
+            self.aparicion_jugador["fila"],
+            self.aparicion_jugador["columna"],
+        )
+        self.spawn_meta: tuple[int, int] | None = None
 
         self._establecer_celda(
             self.aparicion_jugador["fila"],
