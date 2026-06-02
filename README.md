@@ -33,3 +33,6 @@ python -m src.editor
 ```
 
 Comentario agregado para verificar el pull request.
+La imagen del player la saca de https://www.sandromaglione.com/articles/pixel-art-top-down-game-sprite-design-and-animation
+la del pasto fue rescatada de https://art.pixilart.com/02aa0790086f91a.png
+EL ultimo link no se si sea el original tuve inconvenientes
