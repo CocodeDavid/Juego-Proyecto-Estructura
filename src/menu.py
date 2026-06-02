@@ -97,32 +97,67 @@ class Menu:
     def _manejar_eventos_seleccion(self, evento: pygame.event.Event) -> None:
         """Procesa eventos en la selección de nivel."""
         if evento.type == pygame.MOUSEWHEEL:
-            self.desplazamiento_niveles += (
-                evento.y * VELOCIDAD_DESPLAZAMIENTO_MENU
-            )
+            self.desplazamiento_niveles += evento.y * VELOCIDAD_DESPLAZAMIENTO_MENU
             self._ajustar_desplazamiento_niveles()
             return
         if evento.type == pygame.MOUSEBUTTONDOWN and evento.button in (4, 5):
             direccion = 1 if evento.button == 4 else -1
-            self.desplazamiento_niveles += (
-                direccion * VELOCIDAD_DESPLAZAMIENTO_MENU
-            )
+            self.desplazamiento_niveles += direccion * VELOCIDAD_DESPLAZAMIENTO_MENU
             self._ajustar_desplazamiento_niveles()
             return
         if evento.type != pygame.MOUSEBUTTONDOWN or evento.button != 1:
             return
 
-        # 1. Comprobar PRIMERO el botón de volver
+        # 1. Comprobar PRIMERO el botón de volver (así evitamos el bug del solapamiento)
         boton_volver = self._obtener_boton_volver()
         if boton_volver["rect"].collidepoint(evento.pos):
             self._ir_a_principal()
             return
 
-        # 2. Comprobar los botones de nivel SOLO si están visibles
+        # 2. Comprobar los botones de nivel y eliminación
         for boton in self._obtener_botones_nivel():
-            if self._rectangulo_visible(boton["rect"]) and boton["rect"].collidepoint(evento.pos):
-                self._iniciar_juego(boton["nivel"])
-                return
+            # Solo interactuar con los botones si están actualmente en la zona visible
+            if self._rectangulo_visible(boton["rect"]):
+                
+                # ¿Hizo clic en la X roja?
+                if boton["rect_eliminar"].collidepoint(evento.pos):
+                    self._eliminar_nivel(boton["nivel"])
+                    return
+                
+                # ¿Hizo clic en el botón para jugar el nivel?
+                if boton["rect"].collidepoint(evento.pos):
+                    self._iniciar_juego(boton["nivel"])
+                    return
+
+    def _eliminar_nivel(self, ruta_str: str) -> None:
+        """Elimina físicamente el archivo del nivel y lo quita de la lista visual sin recargar el disco."""
+        try:
+            archivo_nivel = Path(ruta_str)
+            if archivo_nivel.exists():
+                archivo_nivel.unlink()  # Borra el archivo .json del disco físico
+                
+            # Filtrar la lista actual en memoria (borrado suave sin desaparecer los demás)
+            niveles_restantes = []
+            for item in self.niveles:
+                # Extraer la ruta de forma segura sin importar si es Diccionario o Path
+                if isinstance(item, dict):
+                    ruta_item = str(item.get("ruta", item.get("archivo", item.get("nivel", ""))))
+                else:
+                    ruta_item = str(item)
+                    
+                # Conservar solo los niveles que NO son el que acabamos de borrar
+                if ruta_item != ruta_str:
+                    niveles_restantes.append(item)
+                    
+            # Actualizamos la lista de niveles que dibuja la pantalla
+            self.niveles = niveles_restantes
+            
+            # Reajustar el scroll por si borramos el último y queda espacio vacío
+            if hasattr(self, "_ajustar_desplazamiento_niveles"):
+                self._ajustar_desplazamiento_niveles()
+                
+        except Exception as error:
+            print(f"Error al eliminar el nivel: {error}")
 
     def _manejar_eventos_configuracion(self, evento: pygame.event.Event) -> None:
         """Procesa eventos en la pantalla de configuración."""
@@ -164,13 +199,45 @@ class Menu:
             self._dibujar_boton(boton["rect"], boton["texto"], False)
 
     def _dibujar_seleccion_nivel(self) -> None:
-        """Renderiza la selección de nivel y la lista desplazable."""
-        self._dibujar_titulo("Seleccionar nivel")
+        """Renderiza la pantalla de selección de nivel."""
+        self.pantalla.fill(COLOR_FONDO_MENU)
+
+        # Título de la pantalla
+        titulo = self.fuente_titulo.render("Seleccionar Nivel", True, COLOR_TEXTO)
+        self.pantalla.blit(titulo, titulo.get_rect(center=(ANCHO // 2, 50)))
+
+        posicion_mouse = pygame.mouse.get_pos()
+
+        # Dibujar botones de niveles
         for boton in self._obtener_botones_nivel():
+            # SOLO dibujar si el botón cae en el área visible de la pantalla (evita bugs visuales)
             if self._rectangulo_visible(boton["rect"]):
-                self._dibujar_boton(boton["rect"], boton["texto"], False)
+                # --- 1. Dibujar botón del nivel ---
+                color_actual = COLOR_BOTON
+                if boton["rect"].collidepoint(posicion_mouse):
+                    color_actual = COLOR_BOTON_HOVER
+                
+                pygame.draw.rect(self.pantalla, color_actual, boton["rect"], border_radius=RADIO_BOTON_MENU)
+                texto = self.fuente_boton.render(boton["nombre"], True, COLOR_TEXTO)
+                self.pantalla.blit(texto, texto.get_rect(center=boton["rect"].center))
+
+                # --- 2. Dibujar botón de eliminar (X roja) ---
+                color_eliminar = (180, 50, 50)  # Rojo oscuro por defecto
+                if boton["rect_eliminar"].collidepoint(posicion_mouse):
+                    color_eliminar = (235, 60, 60)  # Rojo brillante si el cursor está encima
+                
+                pygame.draw.rect(self.pantalla, color_eliminar, boton["rect_eliminar"], border_radius=RADIO_BOTON_MENU)
+                texto_x = self.fuente_boton.render("X", True, (255, 255, 255))
+                self.pantalla.blit(texto_x, texto_x.get_rect(center=boton["rect_eliminar"].center))
+
+        # Dibujar botón Volver
         boton_volver = self._obtener_boton_volver()
-        self._dibujar_boton(boton_volver["rect"], boton_volver["texto"], False)
+        color_volver = COLOR_BOTON
+        if boton_volver["rect"].collidepoint(posicion_mouse):
+            color_volver = COLOR_BOTON_HOVER
+        pygame.draw.rect(self.pantalla, color_volver, boton_volver["rect"], border_radius=RADIO_BOTON_MENU)
+        texto_volver = self.fuente_boton.render(boton_volver["texto"], True, COLOR_TEXTO)
+        self.pantalla.blit(texto_volver, texto_volver.get_rect(center=boton_volver["rect"].center))
 
     def _dibujar_configuracion(self) -> None:
         """Renderiza la pantalla de configuración del algoritmo."""
@@ -288,19 +355,51 @@ class Menu:
             botones.append({"texto": opcion["texto"], "accion": opcion["accion"], "rect": rect})
         return botones
 
-    def _obtener_botones_nivel(self) -> list[dict[str, object]]:
-        """Genera los botones de niveles disponibles."""
-        botones: list[dict[str, object]] = []
-        inicio_y = MARGEN_SUPERIOR_LISTA_MENU + self.desplazamiento_niveles
-        for indice, nivel in enumerate(self.niveles):
-            y = inicio_y + indice * (ALTO_BOTON_MENU + ESPACIADO_BOTONES_MENU)
-            rect = pygame.Rect(
-                (ANCHO - ANCHO_BOTON_MENU) // 2,
-                y,
-                ANCHO_BOTON_MENU,
-                ALTO_BOTON_MENU,
+    def _obtener_botones_nivel(self) -> list[dict]:
+        """Calcula la geometría de los botones de nivel basados en el desplazamiento."""
+        botones = []
+        ancho_boton = ANCHO_BOTON_MENU
+        alto_boton = ALTO_BOTON_MENU
+        espaciado = ESPACIADO_BOTONES_MENU
+        
+        # Tamaño para el botón de eliminar (un cuadrado rojo alineado con la altura del nivel)
+        tamano_eliminar = alto_boton 
+        espacio_entre_botones = 10
+        
+        # Ancho total combinado (Botón del nivel + separación + Botón X)
+        ancho_total_bloque = ancho_boton + espacio_entre_botones + tamano_eliminar
+        
+        x_inicio = ANCHO // 2 - ancho_total_bloque // 2
+        y_inicio = MARGEN_SUPERIOR_LISTA_MENU + self.desplazamiento_niveles
+
+        for indice, item in enumerate(self.niveles):
+            y_boton = y_inicio + indice * (alto_boton + espaciado)
+            
+            # --- CORRECCIÓN: Compatibilidad entre Diccionarios y objetos Path ---
+            if isinstance(item, dict):
+                # Si viene como diccionario (carga inicial del menú)
+                ruta_str = str(item.get("ruta", item.get("archivo", item.get("nivel", ""))))
+                nombre_nivel = str(item.get("nombre", "Nivel"))
+            else:
+                # Si viene como objeto Path (cuando recargamos la lista tras eliminar)
+                ruta_str = str(item)
+                nombre_nivel = item.stem
+            # --------------------------------------------------------------------
+            
+            rect_nivel = pygame.Rect(x_inicio, y_boton, ancho_boton, alto_boton)
+            rect_eliminar = pygame.Rect(
+                x_inicio + ancho_boton + espacio_entre_botones, 
+                y_boton, 
+                tamano_eliminar, 
+                alto_boton
             )
-            botones.append({"texto": nivel["nombre"], "nivel": nivel, "rect": rect})
+            
+            botones.append({
+                "nivel": ruta_str,
+                "nombre": nombre_nivel,
+                "rect": rect_nivel,
+                "rect_eliminar": rect_eliminar
+            })
         return botones
 
     def _obtener_boton_volver(self) -> dict[str, object]:
@@ -445,18 +544,33 @@ class Menu:
         self.algoritmo_enemigo = algoritmo
         self._guardar_configuracion_actual()
 
-    def _iniciar_juego(self, nivel: dict[str, object]) -> None:
-        """Carga el nivel seleccionado e inicia el juego."""
-        from src.game import Game
+    def _iniciar_juego(self, nivel) -> None:
+        """Inicia el juego cargando el nivel seleccionado de forma segura."""
+        try:
+            # --- CORRECCIÓN DE TIPO ---
+            # Si el nivel ya es un string (lo común con los nuevos botones), lo usamos directamente.
+            # Si viene como diccionario, extraemos su ruta de forma segura.
+            if isinstance(nivel, dict):
+                ruta_final = str(nivel.get("ruta", nivel.get("archivo", nivel.get("nivel", ""))))
+            else:
+                ruta_final = str(nivel)
+            # ---------------------------
 
-        ruta = nivel.get("ruta")
-        juego = Game()
-        if isinstance(ruta, Path):
-            juego.cargar_nivel(str(ruta))
-        juego.ejecutar()
-
-        self._restablecer_menu()
-        self.pantalla_actual = PANTALLA_PRINCIPAL
+            # Aquí va tu lógica original para lanzar el juego. 
+            # Asegúrate de pasar 'ruta_final' al constructor de tu clase Game o al cargador del nivel.
+            from src.game import Game
+            instancia_juego = Game()
+            
+            # Cargamos el nivel usando la ruta limpia en string
+            instancia_juego.cargar_nivel(ruta_final) 
+            instancia_juego.ejecutar()
+            
+            # Al regresar del juego, reajustamos la pantalla del menú por si acaso
+            pygame.display.set_mode((ANCHO, ALTO))
+            pygame.display.set_caption(TITULO_VENTANA)
+            
+        except Exception as e:
+            print(f"Error al iniciar el juego con el nivel {nivel}: {e}")
 
     def _abrir_editor(self) -> None:
         """Abre el editor de niveles y regresa al menú."""
