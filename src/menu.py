@@ -112,14 +112,17 @@ class Menu:
         if evento.type != pygame.MOUSEBUTTONDOWN or evento.button != 1:
             return
 
-        for boton in self._obtener_botones_nivel():
-            if boton["rect"].collidepoint(evento.pos):
-                self._iniciar_juego(boton["nivel"])
-                return
-
+        # 1. Comprobar PRIMERO el botón de volver
         boton_volver = self._obtener_boton_volver()
         if boton_volver["rect"].collidepoint(evento.pos):
             self._ir_a_principal()
+            return
+
+        # 2. Comprobar los botones de nivel SOLO si están visibles
+        for boton in self._obtener_botones_nivel():
+            if self._rectangulo_visible(boton["rect"]) and boton["rect"].collidepoint(evento.pos):
+                self._iniciar_juego(boton["nivel"])
+                return
 
     def _manejar_eventos_configuracion(self, evento: pygame.event.Event) -> None:
         """Procesa eventos en la pantalla de configuración."""
