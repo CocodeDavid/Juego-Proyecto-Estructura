@@ -2,6 +2,7 @@
 
 import json
 import string
+import sys
 from pathlib import Path
 
 import pygame
@@ -296,8 +297,135 @@ class LevelEditor:
             
         pygame.display.flip()
 
+    def _mostrar_advertencia(self, mensaje: str, tipo: str) -> bool:
+        """Muestra una ventana modal de advertencia bloqueando el loop."""
+        ancho_pantalla = self.pantalla.get_width()
+        alto_pantalla = self.pantalla.get_height()
+        
+        capa_oscura = pygame.Surface((ancho_pantalla, alto_pantalla), pygame.SRCALPHA)
+        capa_oscura.fill((0, 0, 0, 160))
+        
+        ancho_modal = 480
+        alto_modal = 200
+        x_modal = (ancho_pantalla - ancho_modal) // 2
+        y_modal = (alto_pantalla - alto_modal) // 2
+        rect_modal = pygame.Rect(x_modal, y_modal, ancho_modal, alto_modal)
+        
+        fuente_texto = pygame.font.SysFont(None, 18)
+        botones = []
+        alto_btn = 44
+        y_btn = rect_modal.bottom - alto_btn - 20
+        
+        if tipo == "bloqueo":
+            rect_volver = pygame.Rect(rect_modal.centerx - 100, y_btn, 200, alto_btn)
+            botones.append({
+                "texto": "Volver a editar",
+                "rect": rect_volver,
+                "color": (70, 70, 80),
+                "resultado": False
+            })
+        elif tipo == "confirmacion":
+            rect_si = pygame.Rect(rect_modal.left + 26, y_btn, 200, alto_btn)
+            rect_no = pygame.Rect(rect_modal.right - 226, y_btn, 200, alto_btn)
+            botones.append({
+                "texto": "Sí, guardar igual",
+                "rect": rect_si,
+                "color": (60, 120, 60),
+                "resultado": True
+            })
+            botones.append({
+                "texto": "No, volver a editar",
+                "rect": rect_no,
+                "color": (120, 60, 60),
+                "resultado": False
+            })
+
+        fondo_congelado = self.pantalla.copy()
+        reloj = pygame.time.Clock()
+        
+        while True:
+            pos_mouse = pygame.mouse.get_pos()
+            for evento in pygame.event.get():
+                if evento.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
+                    for b in botones:
+                        if b["rect"].collidepoint(pos_mouse):
+                            return b["resultado"]
+            
+            self.pantalla.blit(fondo_congelado, (0, 0))
+            self.pantalla.blit(capa_oscura, (0, 0))
+            
+            pygame.draw.rect(self.pantalla, (30, 30, 40), rect_modal)
+            pygame.draw.rect(self.pantalla, (255, 255, 255), rect_modal, 1)
+            
+            sup_texto = fuente_texto.render(mensaje, True, (255, 255, 255), wraplength=440)
+            rect_texto = sup_texto.get_rect(centerx=rect_modal.centerx, top=rect_modal.top + 25)
+            self.pantalla.blit(sup_texto, rect_texto)
+            
+            for b in botones:
+                c_base = b["color"]
+                if b["rect"].collidepoint(pos_mouse):
+                    c_base = (
+                        min(c_base[0] + 20, 255),
+                        min(c_base[1] + 20, 255),
+                        min(c_base[2] + 20, 255)
+                    )
+                pygame.draw.rect(self.pantalla, c_base, b["rect"], border_radius=4)
+                t_btn = fuente_texto.render(b["texto"], True, (255, 255, 255))
+                self.pantalla.blit(t_btn, t_btn.get_rect(center=b["rect"].center))
+            
+            pygame.display.flip()
+            reloj.tick(60)
+
     def guardar(self) -> None:
-        """Abre la interfaz de guardado."""
+        """Abre la interfaz de guardado tras las validaciones secuenciales."""
+        conteo_spawn = self._contar_baldosas(CELDA_APARICION_JUGADOR)
+        conteo_meta = self._contar_baldosas(TILE_META)
+        conteo_enemigos = self._contar_baldosas(CELDA_APARICION_ENEMIGO)
+
+        # VALIDACIÓN 1
+        if conteo_spawn == 0 and conteo_meta == 0:
+            self._mostrar_advertencia("No hay spawn del jugador ni meta definidos en el nivel.", "bloqueo")
+            return
+        elif conteo_spawn == 0:
+            self._mostrar_advertencia("No hay spawn del jugador definido en el nivel.", "bloqueo")
+            return
+        elif conteo_meta == 0:
+            self._mostrar_advertencia("No hay meta definida en el nivel.", "bloqueo")
+            return
+
+        # VALIDACIÓN 2
+        from src.grafo import Grafo
+        from src.busqueda import bfs
+        
+        grafo = Grafo()
+        grafo.construir_desde_grilla(self.cuadricula)
+        
+        spawn = None
+        meta_pos = None
+        for f in range(self.cuadricula.filas):
+            for c in range(self.cuadricula.columnas):
+                if self.cuadricula.celdas[f][c] == CELDA_APARICION_JUGADOR:
+                    spawn = (f, c)
+                elif self.cuadricula.celdas[f][c] == TILE_META:
+                    meta_pos = (f, c)
+
+        self.cuadricula.spawn_jugador = spawn
+        self.cuadricula.spawn_meta = meta_pos
+
+        camino = bfs(grafo, spawn, meta_pos)
+        if not camino:
+            self._mostrar_advertencia("No existe un camino posible desde el spawn del jugador hasta la meta. Revisa que no haya paredes bloqueando el paso.", "bloqueo")
+            return
+
+        # VALIDACIÓN 3
+        if conteo_enemigos == 0:
+            confirmacion = self._mostrar_advertencia("El nivel no tiene enemigos definidos. ¿Deseas guardarlo de todas formas?", "confirmacion")
+            if not confirmacion:
+                return
+
         self.mostrando_dialogo_guardar = True
         self.nombre_nivel_input = ""
 
@@ -323,9 +451,9 @@ class LevelEditor:
         ruta_completa = ruta_niveles / nombre_archivo
 
         aparicion_jugador, apariciones_enemigo, meta = self._buscar_apariciones()
+        
+        # TAREA 2: Clonamos la matriz pero YA NO la sobrescribimos con CELDA_SUELO
         baldosas = [fila.copy() for fila in self.cuadricula.celdas]
-        if meta:
-            baldosas[meta["fila"]][meta["columna"]] = CELDA_SUELO
         
         datos_nivel = {
             "name": nombre_original,
