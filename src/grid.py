@@ -12,6 +12,7 @@ from settings import (
     CELDA_SUELO,
     COLOR_META,
     TILE_META,
+    TAMANO_CELDA,
 )
 from src.grafo import Grafo
 
@@ -30,6 +31,12 @@ class Grid:
         self.spawn_meta: tuple[int, int] | None = None
         self.grafo = Grafo()
         self.grafo.construir_desde_grilla(self)
+        try:
+            imagen_original = pygame.image.load("assets/tiles/pasto.png").convert_alpha()
+            self.textura_pasto = pygame.transform.scale(imagen_original, (self.tamano_celda, self.tamano_celda))
+        except Exception as e:
+            print(f"Advertencia: No se pudo cargar assets/tiles/pasto.png. Se usará color plano. Error: {e}")
+            self.textura_pasto = None
 
     def cargar_desde_json(self, ruta: str) -> None:
         """Carga las baldosas desde un archivo JSON de nivel."""
@@ -145,7 +152,7 @@ class Grid:
             self.celdas[fila][self.columnas - 1] = CELDA_MURO
 
     def dibujar(self, pantalla: pygame.Surface, offset_x: int = 0) -> None:
-        """Dibuja la cuadrícula en la superficie aplicando un desplazamiento en X."""
+        """Dibuja la cuadrícula en la superficie aplicando un desplazamiento en X y texturas."""
         colores = {
             CELDA_SUELO: (35, 35, 35),
             CELDA_MURO: (110, 110, 110),
@@ -161,14 +168,22 @@ class Grid:
                     es_meta = True
                 elif valor == TILE_META:
                     es_meta = True
-                color = COLOR_META if es_meta else colores.get(valor, colores[CELDA_SUELO])
+
                 rectangulo = pygame.Rect(
                     offset_x + columna * self.tamano_celda,
                     fila * self.tamano_celda,
                     self.tamano_celda,
                     self.tamano_celda,
                 )
-                pygame.draw.rect(pantalla, color, rectangulo)
+
+                # --- MODIFICACIÓN: Dibujar la textura del pasto para el suelo ---
+                if not es_meta and valor == CELDA_SUELO and getattr(self, 'textura_pasto', None):
+                    pantalla.blit(self.textura_pasto, rectangulo.topleft)
+                else:
+                    # Si es muro, spawn, meta o no se cargó la textura, dibuja el rectángulo de color plano original
+                    color = COLOR_META if es_meta else colores.get(valor, colores[CELDA_SUELO])
+                    pygame.draw.rect(pantalla, color, rectangulo)
+
                 if es_meta:
                     pygame.draw.rect(pantalla, (255, 255, 255), rectangulo, 2)
 

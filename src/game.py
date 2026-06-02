@@ -29,7 +29,11 @@ class Game:
     """Controlador principal del juego para gestionar entidades y renderizado."""
 
     def __init__(self) -> None:
-        """Inicializa el estado del juego y los objetos principales."""
+        """Inicializa el estado del juego y los objetos principales.lo que esta aca es lo que unicamente se usa aca y por eso no esta en settings"""
+        self.DIR_ABAJO = 0
+        self.DIR_DERECHA = 1
+        self.DIR_ARRIBA = 2
+        self.DIR_IZQUIERDA = 3
         self.offset_x = 0
         self.cuadricula = Grid(FILAS, COLUMNAS, TAMANO_CELDA)
         self.jugador = Jugador(self.cuadricula.spawn_jugador)
@@ -58,6 +62,61 @@ class Game:
             {"texto": "Volver al menú", "accion": "menu", "color": (200, 150, 40), "rect": pygame.Rect(0, 0, 0, 0)},
             {"texto": "Salir", "accion": "salir", "color": (200, 60, 60), "rect": pygame.Rect(0, 0, 0, 0)},
         ]
+        # Reemplaza tu bloque de carga de textura player por este:
+        try:
+            # 1. Cargamos el pliego de sprites completo
+            spritesheet_original = pygame.image.load("assets/tiles/player.png").convert_alpha()
+            
+            # Calculamos el tamaño de cada "cuadradito" individual dentro del pliego (es 3x3)
+            ancho_pliego, alto_pliego = spritesheet_original.get_size()
+            ancho_frame_original = ancho_pliego // 3
+            alto_frame_original = alto_pliego // 3
+            
+            # 2. Creamos un diccionario para organizar nuestras animaciones
+            self.animaciones = {
+                self.DIR_ABAJO: [],
+                self.DIR_DERECHA: [],
+                self.DIR_ARRIBA: [],
+                self.DIR_IZQUIERDA: []
+            }
+            
+            # Función auxiliar para recortar y reescalar cada frame al tamaño de tu juego
+            def recortar_y_escalar(fila, columna):
+                # Recortamos el frame original (área exacta en píxeles)
+                area_recorte = pygame.Rect(columna * ancho_frame_original, fila * alto_frame_original, ancho_frame_original, alto_frame_original)
+                frame_original = spritesheet_original.subsurface(area_recorte)
+                
+                # Lo reescalamos para que encaje perfecto en tu TAMANO_CELDA
+                return pygame.transform.scale(frame_original, (TAMANO_CELDA, TAMANO_CELDA))
+
+            # 3. "Cortamos" el spritesheet y llenamos el diccionario
+            for frame_col in range(3):
+                # Recortamos la fila de ABAJO (Row 0)
+                frame_abajo = recortar_y_escalar(0, frame_col)
+                self.animaciones[self.DIR_ABAJO].append(frame_abajo)
+                
+                frame_izquierda = recortar_y_escalar(1, frame_col)
+                self.animaciones[self.DIR_IZQUIERDA].append(frame_izquierda)
+                
+                # Espejamos el frame de la izquierda para obtener la caminata a la DERECHA
+                frame_derecha = pygame.transform.flip(frame_izquierda, True, False)
+                self.animaciones[self.DIR_DERECHA].append(frame_derecha)
+                
+                # Recortamos la fila de ARRIBA (Row 2)
+                frame_arriba = recortar_y_escalar(2, frame_col)
+                self.animaciones[self.DIR_ARRIBA].append(frame_arriba)
+                
+                
+            # 4. Variables de estado para el player
+            self.orientacion_actual = self.DIR_ABAJO # Empieza mirando hacia abajo
+            self.indice_frame_actual = 0           # Empieza en el primer frame (estático)
+            self.timer_animacion = 0               # Temporizador para cambiar frames
+            self.velocidad_animacion = 150         # Milisegundos entre cada cambio de frame
+            self.esta_moviendose = False           # Solo animamos si el player se mueve
+            
+        except Exception as e:
+            print(f"Advertencia: No se pudo cargar el spritesheet de player. Error: {e}")
+            self.animaciones = None
 
     def _cargar_configuracion(self) -> tuple[str, bool]:
         """Carga la configuración guardada del enemigo y la visualización."""
@@ -171,13 +230,37 @@ class Game:
         if self.pausado or self.game_over or self.estado == "ganaste":
             return
             
+        # --- NUEVO: Guardar la posición antes de mover ---
+        pos_x_anterior = self.jugador.x
+        pos_y_anterior = self.jugador.y
+        # ------------------------------------------------
+
         self.jugador.actualizar()
+
+        # --- NUEVO: Detectar dirección y movimiento según el cambio de coordenadas ---
+        dx = self.jugador.x - pos_x_anterior
+        dy = self.jugador.y - pos_y_anterior
+        
+        if dx > 0:
+            self.orientacion_actual = self.DIR_DERECHA
+        elif dx < 0:
+            self.orientacion_actual = self.DIR_IZQUIERDA
+        elif dy > 0:
+            self.orientacion_actual = self.DIR_ABAJO
+        elif dy < 0:
+            self.orientacion_actual = self.DIR_ARRIBA
+            
+        # Si la posición cambió en X o Y, significa que se está moviendo
+        self.esta_moviendose = (dx != 0 or dy != 0)
+        # -----------------------------------------------------------------------------
+
         if (
             self.cuadricula.spawn_meta
             and (self.jugador.fila, self.jugador.columna) == self.cuadricula.spawn_meta
         ):
             self.estado = "ganaste"
             return
+            
         for enemigo in self.enemigos:
             enemigo.actualizar(
                 self.cuadricula, 
@@ -222,7 +305,30 @@ class Game:
         """Dibuja la escena del juego en la ventana."""
         self.pantalla.fill(COLOR_FONDO)
         self.cuadricula.dibujar(self.pantalla, offset_x=self.offset_x)
-        self.jugador.dibujar(self.pantalla, offset_x=self.offset_x)
+        
+        # --- MODIFICACIÓN: Renderizar Sprite Animado en lugar de la bolita ---
+        if getattr(self, 'animaciones', None) and self.orientacion_actual in self.animaciones:
+            frames_direccion = self.animaciones[self.orientacion_actual]
+            
+            if self.esta_moviendose:
+                # El reloj de pygame nos da el tiempo exacto en milisegundos desde el último frame
+                self.timer_animacion += self.reloj.get_time() 
+                if self.timer_animacion > self.velocidad_animacion:
+                    self.indice_frame_actual = (self.indice_frame_actual + 1) % len(frames_direccion)
+                    self.timer_animacion = 0
+            else:
+                self.indice_frame_actual = 0 # Volver al frame 0 (quieto) si no hay movimiento
+                
+            imagen_final = frames_direccion[self.indice_frame_actual]
+            posicion_pantalla = (
+                self.offset_x + self.jugador.x - TAMANO_CELDA // 2,
+                self.jugador.y - TAMANO_CELDA // 2
+            )
+            self.pantalla.blit(imagen_final, posicion_pantalla)
+        else:
+            # Respaldo de seguridad por si el archivo .png no se encontró
+            self.jugador.dibujar(self.pantalla, offset_x=self.offset_x)
+        # ----------------------------------------------------------------------
         
         # Dibujar los enemigos actuales en pantalla
         for enemigo in self.enemigos:

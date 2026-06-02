@@ -109,6 +109,16 @@ class LevelEditor:
         self.color_mensaje_barra = (200, 60, 60)
         self.tiempo_mensaje_barra = 0
         self.duracion_mensaje_barra = 2000
+        try:
+            imagen_original = pygame.image.load("assets/tiles/pasto.png").convert_alpha()
+            # El icono pequeño para el botón lateral
+            self.icono_pasto = pygame.transform.scale(imagen_original, (TAMANO_COLOR_MATERIAL, TAMANO_COLOR_MATERIAL))
+            # NUEVO: La textura a tamaño real para rellenar la matriz del editor
+            self.textura_pasto_editor = pygame.transform.scale(imagen_original, (TAMANO_CELDA, TAMANO_CELDA))
+        except Exception as e:
+            print(f"Advertencia: No se pudo cargar assets/tiles/pasto.png. Error: {e}")
+            self.icono_pasto = None
+            self.textura_pasto_editor = None
 
     def ejecutar(self) -> None:
         """Ejecuta la pantalla del editor."""
@@ -271,24 +281,32 @@ class LevelEditor:
         
         for fila, fila_baldosas in enumerate(self.cuadricula.celdas):
             for columna, baldosa in enumerate(fila_baldosas):
-                if baldosa == CELDA_MURO:
-                    color = COLOR_MURO
-                elif baldosa == CELDA_APARICION_JUGADOR:
-                    color = COLOR_APARICION_JUGADOR
-                elif baldosa == CELDA_APARICION_ENEMIGO:
-                    color = COLOR_APARICION_ENEMIGO
-                elif baldosa == TILE_META:
-                    color = COLOR_META
-                else:
-                    color = COLOR_SUELO
-                    
+                
                 rectangulo = pygame.Rect(
                     self.ancho_barra_herramientas + columna * TAMANO_CELDA,
                     fila * TAMANO_CELDA,
                     TAMANO_CELDA,
                     TAMANO_CELDA,
                 )
-                pygame.draw.rect(self.pantalla, color, rectangulo)
+                
+                # --- MODIFICACIÓN: Dibujar la textura si es suelo, si no, usar colores ---
+                if baldosa == CELDA_SUELO and getattr(self, 'textura_pasto_editor', None):
+                    self.pantalla.blit(self.textura_pasto_editor, rectangulo.topleft)
+                else:
+                    if baldosa == CELDA_MURO:
+                        color = COLOR_MURO
+                    elif baldosa == CELDA_APARICION_JUGADOR:
+                        color = COLOR_APARICION_JUGADOR
+                    elif baldosa == CELDA_APARICION_ENEMIGO:
+                        color = COLOR_APARICION_ENEMIGO
+                    elif baldosa == TILE_META:
+                        color = COLOR_META
+                    else:
+                        color = COLOR_SUELO
+                        
+                    pygame.draw.rect(self.pantalla, color, rectangulo)
+                
+                # Dibujar la rejilla encima de la textura/color
                 pygame.draw.rect(self.pantalla, COLOR_REJILLA, rectangulo, 1)
                 
         # Dibuja la mini-ventana superpuesta si corresponde
@@ -573,7 +591,14 @@ class LevelEditor:
                 TAMANO_COLOR_MATERIAL,
                 TAMANO_COLOR_MATERIAL,
             )
-            pygame.draw.rect(self.pantalla, boton["color"], cuadrado_color)
+            
+            # --- MODIFICACIÓN: Dibujar icono de textura o color plano ---
+            if boton["valor"] == CELDA_SUELO and getattr(self, 'icono_pasto', None):
+                self.pantalla.blit(self.icono_pasto, cuadrado_color.topleft)
+                # Opcional: Le dibujamos un borde sutil para que resalte en el botón oscuro
+                pygame.draw.rect(self.pantalla, (100, 100, 100), cuadrado_color, 1)
+            else:
+                pygame.draw.rect(self.pantalla, boton["color"], cuadrado_color)
             texto = self.fuente_botones_barra.render(
                 boton["nombre"], True, COLOR_TEXTO_BARRA
             )
