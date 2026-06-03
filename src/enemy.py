@@ -24,9 +24,60 @@ class Enemy:
         
         # NUEVO: Memoria para saber si el jugador se movió desde el último cálculo
         self.ultima_posicion_jugador: tuple[int, int] | None = None
+        # --- NUEVO: Constantes de orientación para el enemigo ---
+        self.DIR_ABAJO = 0
+        self.DIR_DERECHA = 1
+        self.DIR_ARRIBA = 2
+        self.DIR_IZQUIERDA = 3
+        
+        self.orientacion_actual = self.DIR_ABAJO
+        self.indice_frame_actual = 0
+        self.timer_animacion = 0
+        self.velocidad_animacion = 150  # Milisegundos por frame
+        self.esta_moviendose = False
+
+        # --- NUEVO: Cargar y cortar el spritesheet del enemigo ---
+        try:
+            spritesheet_original = pygame.image.load("assets/tiles/enemy_spritesheet.png").convert_alpha()
+            ancho_pliego, alto_pliego = spritesheet_original.get_size()
+            ancho_frame_original = ancho_pliego // 3
+            alto_frame_original = alto_pliego // 3
+            
+            self.animaciones = {
+                self.DIR_ABAJO: [],
+                self.DIR_DERECHA: [],
+                self.DIR_ARRIBA: [],
+                self.DIR_IZQUIERDA: []
+            }
+            
+            def recortar_y_escalar(fila, columna):
+                area_recorte = pygame.Rect(columna * ancho_frame_original, fila * alto_frame_original, ancho_frame_original, alto_frame_original)
+                frame_original = spritesheet_original.subsurface(area_recorte)
+                return pygame.transform.scale(frame_original, (TAMANO_CELDA, TAMANO_CELDA))
+
+            for frame_col in range(3):
+                # Fila 0: Abajo
+                self.animaciones[self.DIR_ABAJO].append(recortar_y_escalar(0, frame_col))
+                
+                # Fila 1: Izquierda (en tu imagen el policía mira originalmente a la izquierda)
+                frame_izq = recortar_y_escalar(1, frame_col)
+                self.animaciones[self.DIR_IZQUIERDA].append(frame_izq)
+                
+                # Espejamos la izquierda para crear la Derecha
+                frame_der = pygame.transform.flip(frame_izq, True, False)
+                self.animaciones[self.DIR_DERECHA].append(frame_der)
+                
+                # Fila 2: Arriba
+                self.animaciones[self.DIR_ARRIBA].append(recortar_y_escalar(2, frame_col))
+                
+        except Exception as e:
+            print(f"Advertencia: No se pudo cargar assets/tiles/enemy_spritesheet.png. Error: {e}")
+            self.animaciones = None
 
     def actualizar(self, cuadricula, posicion_jugador: tuple[int, int], algoritmo: str) -> None:
         """Actualiza el camino y desplaza al enemigo hacia el jugador."""
+        pos_x_anterior = self.x
+        pos_y_anterior = self.y
         if not self.moviendose:
             inicio = (self.fila, self.columna)
             
@@ -69,11 +120,44 @@ class Enemy:
                 self.fila = self.destino_celda[0]
                 self.columna = self.destino_celda[1]
                 self.moviendose = False
+        dx = self.x - pos_x_anterior
+        dy = self.y - pos_y_anterior
+        
+        if dx > 0:
+            self.orientacion_actual = self.DIR_DERECHA
+        elif dx < 0:
+            self.orientacion_actual = self.DIR_IZQUIERDA
+        elif dy > 0:
+            self.orientacion_actual = self.DIR_ABAJO
+        elif dy < 0:
+            self.orientacion_actual = self.DIR_ARRIBA
+            
+        self.esta_moviendose = (dx != 0 or dy != 0)
 
-    def dibujar(self, pantalla: pygame.Surface, offset_x: int = 0) -> None:
-        """Dibuja al enemigo en pantalla."""
-        centro_x = int(self.x + offset_x)
-        centro_y = int(self.y)
-        radio = (TAMANO_CELDA - 6) // 2
-        pygame.draw.circle(pantalla, self.color, (centro_x, centro_y), radio)
-        pygame.draw.circle(pantalla, (255, 255, 255), (centro_x, centro_y), radio, 1)
+    def dibujar(self, pantalla, offset_x=0) -> None:
+        # --- MODIFICACIÓN: Dibujar enemigo animado o usar respaldo ---
+        if getattr(self, 'animaciones', None) and self.orientacion_actual in self.animaciones:
+            frames_direccion = self.animaciones[self.orientacion_actual]
+            
+            if self.esta_moviendose:
+                # Usamos el reloj interno global de Pygame para controlar los frames del enemigo
+                tiempo_actual = pygame.time.get_ticks()
+                if tiempo_actual - self.timer_animacion > self.velocidad_animacion:
+                    self.indice_frame_actual = (self.indice_frame_actual + 1) % len(frames_direccion)
+                    self.timer_animacion = tiempo_actual
+            else:
+                self.indice_frame_actual = 0 # Frame estático si no camina
+                
+            imagen_final = frames_direccion[self.indice_frame_actual]
+            
+            # Centrado perfecto en la celda
+            posicion_pantalla = (
+                offset_x + self.x - TAMANO_CELDA // 2,
+                self.y - TAMANO_CELDA // 2
+            )
+            pantalla.blit(imagen_final, posicion_pantalla)
+        else:
+            # --- TU RESPALDO VIEJO ---
+            # Deja aquí la línea original que usabas para dibujar el cuadrado/círculo del enemigo
+            # Ejemplo: pygame.draw.circle(pantalla, self.color, (offset_x + self.x, self.y), 15)
+            pass
