@@ -63,6 +63,14 @@ class Menu:
 
         self.niveles: list[dict[str, object]] = []
         self.desplazamiento_niveles = 0
+        # --- NUEVO: Cargar y escalar la imagen de fondo para el menú ---
+        try:
+            # Usamos .convert() para optimizar enormemente el rendimiento del blit en bucle
+            fondo_original = pygame.image.load("assets/tiles/fondo.png").convert()
+            self.fondo_menu = pygame.transform.scale(fondo_original, (ANCHO, ALTO))
+        except Exception as e:
+            print(f"Advertencia: No se pudo cargar assets/textures/fondo.png. Error: {e}")
+            self.fondo_menu = None
 
     def ejecutar(self) -> None:
         """Ejecuta el bucle principal del menú."""
@@ -182,11 +190,18 @@ class Menu:
             self._ir_a_principal()
 
     def _dibujar(self) -> None:
-        """Dibuja la pantalla actual del menú."""
-        self.pantalla.fill(COLOR_FONDO_MENU)
+        """Dibuja la pantalla actual del menú usando la textura o color base."""
+        # --- MODIFICACIÓN: Dibujar fondo con imagen o color plano de respaldo ---
+        if getattr(self, 'fondo_menu', None) is not None:
+            self.pantalla.blit(self.fondo_menu, (0, 0))
+        else:
+            self.pantalla.fill(COLOR_FONDO_MENU)
+        # ------------------------------------------------------------------------
+
         if self.pantalla_actual == PANTALLA_PRINCIPAL:
             self._dibujar_principal()
         elif self.pantalla_actual == PANTALLA_SELECCION_NIVEL:
+            # Quitamos el fill que tenía adentro _dibujar_seleccion_nivel para que no pise el fondo
             self._dibujar_seleccion_nivel()
         elif self.pantalla_actual == PANTALLA_CONFIGURACION:
             self._dibujar_configuracion()
@@ -200,7 +215,7 @@ class Menu:
 
     def _dibujar_seleccion_nivel(self) -> None:
         """Renderiza la pantalla de selección de nivel."""
-        self.pantalla.fill(COLOR_FONDO_MENU)
+        
 
         # Título de la pantalla
         titulo = self.fuente_titulo.render("Seleccionar Nivel", True, COLOR_TEXTO)
